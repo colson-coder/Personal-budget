@@ -23,6 +23,18 @@ import { todayISO } from './util.js';
 const CACHE_KEY = 'pb_rate_cache_v1';
 const BASE = 'https://v6.exchangerate-api.com/v6';
 
+// Approximate USD-per-1-unit rates used ONLY for keyless preview, i.e. while
+// EXCHANGE_RATE_API_KEY is still the placeholder. As soon as a real key is set,
+// this is never used and all rates come live from the provider. These let you
+// demo the app end-to-end (add transactions, see the dashboard populate) before
+// signing up for anything.
+const FALLBACK_RATES = { USD: 1, EUR: 1.08, GBP: 1.27, CRC: 0.00188 };
+
+function keyConfigured() {
+  const k = CONFIG.EXCHANGE_RATE_API_KEY || '';
+  return k && !k.includes('YOUR-');
+}
+
 // In-memory cache mirrors localStorage; keyed "YYYY-MM-DD:CCC" → number.
 const memCache = loadCache();
 
@@ -91,6 +103,16 @@ export async function getRate(currency, date = todayISO()) {
 
   const cached = cacheGet(date, currency);
   if (typeof cached === 'number') return cached;
+
+  // Keyless preview: skip the network entirely and use approximate static rates
+  // so the app is fully demoable before an API key is configured.
+  if (!keyConfigured()) {
+    const fb = FALLBACK_RATES[currency];
+    if (typeof fb === 'number') {
+      cacheSet(date, currency, fb);
+      return fb;
+    }
+  }
 
   let rate;
   const isPast = date < todayISO();
