@@ -6,7 +6,8 @@
 import { db } from '../db.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
-import { el, toast, todayISO, isValidISODate, navigate } from '../util.js';
+import { el, toast, todayISO, isValidISODate } from '../util.js';
+import { navigate } from '../router.js';
 
 export async function renderAdd() {
   const categories = await db.listCategories();

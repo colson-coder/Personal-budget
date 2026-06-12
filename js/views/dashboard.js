@@ -4,7 +4,8 @@
 // =============================================================================
 
 import { db } from '../db.js';
-import { el, fmtUSD, monthBounds, todayISO, currentMonthLabel, navigate } from '../util.js';
+import { el, fmtUSD, monthBounds, todayISO, currentMonthLabel } from '../util.js';
+import { navigate } from '../router.js';
 
 export async function renderDashboard() {
   const [categories, allTx] = await Promise.all([
