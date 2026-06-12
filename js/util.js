@@ -36,14 +36,25 @@ export function isThisMonth(isoDate) {
   return isoDate.slice(0, 7) === todayISO().slice(0, 7);
 }
 
-// "June 2026"-style label for the current month.
-export function currentMonthLabel() {
-  const [y, m] = todayISO().split('-').map(Number);
+// "June 2026"-style label for a "YYYY-MM" month (defaults to current).
+export function monthLabel(ym = todayISO().slice(0, 7)) {
+  const [y, m] = ym.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-US', {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+// "YYYY-MM" arithmetic for month navigation.
+export function nextMonthYM(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+export function prevMonthYM(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
 // Format a number as a currency string. Falls back gracefully for codes that

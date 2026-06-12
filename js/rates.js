@@ -105,13 +105,17 @@ export async function getRate(currency, date = todayISO()) {
   if (typeof cached === 'number') return cached;
 
   // Keyless preview: skip the network entirely and use approximate static rates
-  // so the app is fully demoable before an API key is configured.
+  // so the app is fully demoable before an API key is configured. Unsupported
+  // currencies get a clear error instead of a doomed API call.
   if (!keyConfigured()) {
     const fb = FALLBACK_RATES[currency];
     if (typeof fb === 'number') {
       cacheSet(date, currency, fb);
       return fb;
     }
+    throw new Error(
+      `${currency} needs a live rate — add your ExchangeRate-API key in js/config.js`
+    );
   }
 
   let rate;

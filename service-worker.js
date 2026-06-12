@@ -10,7 +10,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v1';
+const CACHE_VERSION = 'pb-shell-v2';
 
 const APP_SHELL = [
   './',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './js/db.js',
   './js/router.js',
   './js/rates.js',
+  './js/recurring.js',
   './js/util.js',
   './js/views/auth.js',
   './js/views/dashboard.js',

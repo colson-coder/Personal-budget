@@ -46,3 +46,22 @@ create policy "transactions_update_own" on public.transactions
 drop policy if exists "transactions_delete_own" on public.transactions;
 create policy "transactions_delete_own" on public.transactions
   for delete using (auth.uid() = user_id);
+
+-- --- recurring ---------------------------------------------------------------
+alter table public.recurring enable row level security;
+
+drop policy if exists "recurring_select_own" on public.recurring;
+create policy "recurring_select_own" on public.recurring
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "recurring_insert_own" on public.recurring;
+create policy "recurring_insert_own" on public.recurring
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "recurring_update_own" on public.recurring;
+create policy "recurring_update_own" on public.recurring
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "recurring_delete_own" on public.recurring;
+create policy "recurring_delete_own" on public.recurring
+  for delete using (auth.uid() = user_id);

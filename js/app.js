@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { db, isLocalMode, setLocalMode } from './db.js';
+import { applyRecurring } from './recurring.js';
 import { defineRoute, setNotFound, initRouter, navigate } from './router.js';
 import { renderAuth } from './views/auth.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -51,6 +52,16 @@ async function boot() {
   }
 
   renderShell();
+
+  // Auto-tracking: materialize any recurring transactions that came due since
+  // the last launch. Runs after the shell renders so it never blocks the UI;
+  // refreshes the current view if anything was added.
+  applyRecurring().then((n) => {
+    if (n > 0) {
+      toast(`${n} recurring transaction${n === 1 ? '' : 's'} added automatically`, 'success');
+      navigate(location.hash.replace(/^#/, '') || '/dashboard');
+    }
+  });
 }
 
 function renderShell() {

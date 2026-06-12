@@ -1,18 +1,24 @@
 // =============================================================================
-// dashboard.js — Total balance (USD), this month's spend vs budget per category,
-// total spend this month, and the 5 most recent transactions.
+// dashboard.js — Total balance (USD), a month's spend vs budget per category,
+// total spend that month, and the 5 most recent transactions. Use ←/→ to view
+// past months (?month=YYYY-MM query param).
 // =============================================================================
 
 import { db } from '../db.js';
-import { el, fmtUSD, monthBounds, todayISO, currentMonthLabel } from '../util.js';
+import { el, fmtUSD, monthBounds, todayISO, monthLabel, nextMonthYM, prevMonthYM } from '../util.js';
 import { navigate } from '../router.js';
 
-export async function renderDashboard() {
+export async function renderDashboard(params = {}) {
   const [categories, allTx] = await Promise.all([
     db.listCategories(),
     db.listTransactions(),
   ]);
   const catById = new Map(categories.map((c) => [c.id, c]));
+
+  // Which month are we viewing? Defaults to the current CR-calendar month.
+  const thisMonth = todayISO().slice(0, 7);
+  const ym = /^\d{4}-\d{2}$/.test(params.month || '') ? params.month : thisMonth;
+  const isCurrent = ym === thisMonth;
 
   // Total balance = income USD − expense USD, across all time.
   let income = 0, expense = 0;
@@ -22,8 +28,8 @@ export async function renderDashboard() {
   }
   const balance = income - expense;
 
-  // This month's expenses, grouped by category.
-  const { start, end } = monthBounds(todayISO());
+  // The viewed month's expenses, grouped by category.
+  const { start, end } = monthBounds(`${ym}-01`);
   const monthExpenses = allTx.filter(
     (t) => t.type === 'expense' && t.date >= start && t.date <= end
   );
@@ -38,14 +44,25 @@ export async function renderDashboard() {
   const root = el('div', { class: 'view view-dashboard' });
   root.append(el('div', { class: 'view-head' }, [
     el('h1', {}, 'Dashboard'),
-    el('span', { class: 'muted' }, currentMonthLabel()),
+    el('div', { class: 'month-nav' }, [
+      el('button', {
+        class: 'icon-btn', title: 'Previous month',
+        onClick: () => navigate(`/dashboard?month=${prevMonthYM(ym)}`),
+      }, '‹'),
+      el('span', { class: 'month-label' }, monthLabel(ym)),
+      el('button', {
+        class: 'icon-btn', title: 'Next month',
+        disabled: isCurrent ? 'disabled' : null,
+        onClick: () => navigate(`/dashboard?month=${nextMonthYM(ym)}`),
+      }, '›'),
+    ]),
   ]));
 
   // Summary cards
   root.append(el('div', { class: 'grid cards-3' }, [
     summaryCard('Total balance', fmtUSD(balance), balance >= 0 ? 'pos' : 'neg'),
     summaryCard('Income (all time)', fmtUSD(income), 'pos'),
-    summaryCard('Spent this month', fmtUSD(monthTotal), 'neg'),
+    summaryCard(isCurrent ? 'Spent this month' : `Spent in ${monthLabel(ym)}`, fmtUSD(monthTotal), 'neg'),
   ]));
 
   // Budgets
@@ -55,7 +72,7 @@ export async function renderDashboard() {
 
   const budgetCard = el('div', { class: 'card' }, [
     el('div', { class: 'card-head' }, [
-      el('h2', {}, 'Budgets this month'),
+      el('h2', {}, isCurrent ? 'Budgets this month' : `Budgets — ${monthLabel(ym)}`),
       el('a', { class: 'link', href: '#/categories' }, 'Edit'),
     ]),
   ]);
