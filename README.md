@@ -27,9 +27,30 @@ devices.
   Converts to USD at the **transaction's own date** and stores the original
   amount, the USD equivalent, and the exact rate used.
 - **Categories & Budgets** — editable list with monthly USD budgets.
-- **Import** — CSV upload with column mapping, a validated preview (flags bad
-  dates / unknown currencies, maps unknown category names to **Other**, warns on
-  likely duplicates), then a bulk insert.
+- **Recurring transactions (auto-tracking)** — set rent, salary, or
+  subscriptions once (on the Add page) and the app records them automatically
+  every month on their day, catching up any months missed while the app was
+  closed. The dashboard shows what's still **upcoming this month** with a
+  projected month-end balance.
+- **Reports** — "Month in review" digest (spend vs last month, savings rate,
+  largest expense, biggest category movers), a 12-month income-vs-expense
+  chart, and top categories over the last year. All computed client-side,
+  rendered as dependency-free inline SVG.
+- **Budget rollover (envelopes)** — per-category toggle: unspent budget
+  carries into next month, overspending eats into it (YNAB/Actual-style).
+- **Smart fast entry** — description autocomplete from your history that
+  prefills the category and currency you used last time; remembers your
+  last-used currency.
+- **Search** — free-text description search plus exact-amount lookup on the
+  transactions page.
+- **Your data, always** — one-tap JSON backup and CSV export (re-importable);
+  local-mode restores from JSON backups.
+- **Import** — CSV upload with column mapping and a validated preview: flags
+  bad dates / unknown currencies, **auto-categorizes by description keywords**
+  (UBER → Transport, NETFLIX → Subscriptions…), maps unknown category names to
+  **Other**, detects income vs. expense from signed amounts, and warns on
+  likely duplicates (against saved data *and* within the file), then bulk
+  inserts.
 - **Local mode** — "Skip login" toggle that stores everything in this device's
   browser only (no account, no sync). A persistent banner makes local mode
   unmistakable.
@@ -77,7 +98,9 @@ exact same UI code.
 
 1. Sign up at [supabase.com](https://supabase.com) and create a new project.
 2. In **SQL Editor**, run [`sql/schema.sql`](sql/schema.sql), then
-   [`sql/rls.sql`](sql/rls.sql) (in that order).
+   [`sql/rls.sql`](sql/rls.sql) (in that order). Already ran them before the
+   `recurring` table existed? Re-run both — they're idempotent
+   (`create table if not exists` / `drop policy if exists`).
 3. In **Project Settings → API**, copy your **Project URL** and **anon public
    key**.
 

@@ -3,7 +3,7 @@
 // Add / edit / delete.
 // =============================================================================
 
-import { db } from '../db.js';
+import { db, isLocalMode } from '../db.js';
 import { el, fmtUSD, toast } from '../util.js';
 
 export async function renderCategories() {
@@ -25,15 +25,22 @@ export async function renderCategories() {
   function catRow(c) {
     const name = el('input', { type: 'text', value: c.name, class: 'cat-name' });
     const budget = el('input', { type: 'number', min: '0', step: '1', value: Number(c.monthly_budget_usd) || 0, class: 'cat-budget', inputmode: 'decimal' });
+    // Envelope rollover: unspent budget carries into next month (YNAB-style).
+    const rollover = el('input', { type: 'checkbox', class: 'cat-rollover', checked: c.rollover ? 'checked' : null });
 
     const row = el('div', { class: 'cat-row' }, [
       el('div', { class: 'cat-fields' }, [
         name,
         el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, '$'), budget, el('span', { class: 'suffix' }, '/mo')]),
+        el('label', { class: 'rollover-label', title: 'Unspent budget carries into next month' }, [rollover, 'roll over']),
       ]),
       el('div', { class: 'cat-actions' }, [
         el('button', { class: 'btn btn-sm btn-primary', onClick: async () => {
-          const patch = { name: name.value.trim(), monthly_budget_usd: parseFloat(budget.value) || 0 };
+          const patch = {
+            name: name.value.trim(),
+            monthly_budget_usd: parseFloat(budget.value) || 0,
+            rollover: rollover.checked,
+          };
           if (!patch.name) return toast('Name cannot be empty', 'error');
           await db.updateCategory(c.id, patch);
           toast('Saved', 'success');
@@ -68,7 +75,87 @@ export async function renderCategories() {
     } }, 'Add'),
   ]);
   root.append(addCard);
+  root.append(dataCard());
 
   await reload();
   return root;
+}
+
+// --- Your data: export & restore -----------------------------------------------
+// The lesson of Mint shutting down: always be able to walk away with your data.
+function dataCard() {
+  const card = el('div', { class: 'card' }, [
+    el('h2', {}, 'Your data'),
+    el('p', { class: 'muted hint' },
+      'Download a backup anytime. The CSV re-imports through the Import page; the JSON is a full backup (restorable in local mode).'),
+  ]);
+
+  const btnJSON = el('button', { class: 'btn btn-sm' }, 'Export JSON backup');
+  const btnCSV = el('button', { class: 'btn btn-sm' }, 'Export CSV');
+  btnJSON.addEventListener('click', () => exportAll('json'));
+  btnCSV.addEventListener('click', () => exportAll('csv'));
+  const actions = el('div', { class: 'data-actions' }, [btnJSON, btnCSV]);
+
+  // Restore is local-mode only: it overwrites this device's data wholesale.
+  if (isLocalMode()) {
+    const file = el('input', { type: 'file', accept: '.json,application/json', style: 'display:none' });
+    const btnRestore = el('button', { class: 'btn btn-sm btn-ghost' }, 'Restore from JSON…');
+    btnRestore.addEventListener('click', () => file.click());
+    file.addEventListener('change', async () => {
+      const f = file.files?.[0];
+      if (!f) return;
+      try {
+        const data = JSON.parse(await f.text());
+        if (!Array.isArray(data.transactions) || !Array.isArray(data.categories)) {
+          throw new Error('not a Personal Budget backup file');
+        }
+        if (!confirm(`Replace ALL local data with this backup (${data.transactions.length} transactions)?`)) return;
+        await db.restoreAll(data);
+        toast('Backup restored', 'success');
+        location.reload();
+      } catch (err) {
+        toast('Restore failed: ' + (err.message || 'invalid file'), 'error');
+      }
+    });
+    actions.append(btnRestore, file);
+  }
+
+  card.append(actions);
+  return card;
+}
+
+async function exportAll(format) {
+  const [categories, transactions, recurring] = await Promise.all([
+    db.listCategories(),
+    db.listTransactions(),
+    db.listRecurring().catch(() => []),
+  ]);
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  if (format === 'json') {
+    const blob = new Blob(
+      [JSON.stringify({ exported_at: new Date().toISOString(), categories, transactions, recurring }, null, 2)],
+      { type: 'application/json' });
+    download(blob, `personal-budget-backup-${stamp}.json`);
+  } else {
+    // Signed amounts (income +, expense −) so our own importer round-trips it.
+    const catById = new Map(categories.map((c) => [c.id, c.name]));
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Date', 'Amount', 'Currency', 'Description', 'Category'].join(',')];
+    for (const t of transactions) {
+      const signed = (t.type === 'income' ? 1 : -1) * Number(t.amount);
+      lines.push([t.date, signed, t.currency, esc(t.description), esc(catById.get(t.category_id))].join(','));
+    }
+    download(new Blob([lines.join('\n')], { type: 'text/csv' }), `personal-budget-${stamp}.csv`);
+  }
+  toast('Export downloaded', 'success');
+}
+
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }

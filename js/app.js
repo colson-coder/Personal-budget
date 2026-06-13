@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { db, isLocalMode, setLocalMode } from './db.js';
+import { applyRecurring } from './recurring.js';
 import { defineRoute, setNotFound, initRouter, navigate } from './router.js';
 import { renderAuth } from './views/auth.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -12,15 +13,17 @@ import { renderTransactions } from './views/transactions.js';
 import { renderAdd } from './views/add.js';
 import { renderCategories } from './views/categories.js';
 import { renderImport } from './views/import.js';
+import { renderReports } from './views/reports.js';
 import { el, toast } from './util.js';
 
 const app = document.getElementById('app');
 
 const NAV = [
   { path: '/dashboard', label: 'Dashboard', icon: '◧' },
-  { path: '/transactions', label: 'Transactions', icon: '≣' },
+  { path: '/transactions', label: 'Activity', icon: '≣' },
   { path: '/add', label: 'Add', icon: '＋' },
-  { path: '/categories', label: 'Categories', icon: '☰' },
+  { path: '/reports', label: 'Reports', icon: '◔' },
+  { path: '/categories', label: 'Budgets', icon: '☰' },
   { path: '/import', label: 'Import', icon: '↑' },
 ];
 
@@ -51,6 +54,16 @@ async function boot() {
   }
 
   renderShell();
+
+  // Auto-tracking: materialize any recurring transactions that came due since
+  // the last launch. Runs after the shell renders so it never blocks the UI;
+  // refreshes the current view if anything was added.
+  applyRecurring().then((n) => {
+    if (n > 0) {
+      toast(`${n} recurring transaction${n === 1 ? '' : 's'} added automatically`, 'success');
+      navigate(location.hash.replace(/^#/, '') || '/dashboard');
+    }
+  });
 }
 
 function renderShell() {
@@ -84,6 +97,7 @@ function renderShell() {
   defineRoute('/add', renderAdd);
   defineRoute('/categories', renderCategories);
   defineRoute('/import', renderImport);
+  defineRoute('/reports', renderReports);
   setNotFound(renderDashboard);
 
   initRouter(outlet, { onNavigate: highlightNav });

@@ -63,6 +63,14 @@ const supabaseBackend = {
     return data?.user || null;
   },
 
+  // Like getCurrentUser() but throws a clear error instead of letting callers
+  // crash on `user.id` when the session has expired.
+  async requireUser() {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Your session has expired — please log in again.');
+    return user;
+  },
+
   async signUp(email, password) {
     const client = await sb();
     const { data, error } = await client.auth.signUp({
@@ -100,7 +108,7 @@ const supabaseBackend = {
 
   async createCategory(cat) {
     const client = await sb();
-    const user = await this.getCurrentUser();
+    const user = await this.requireUser();
     const { data, error } = await client
       .from('categories')
       .insert({ ...cat, user_id: user.id })
@@ -128,6 +136,51 @@ const supabaseBackend = {
     if (error) throw error;
   },
 
+  // --- recurring rules -------------------------------------------------------
+  async listRecurring() {
+    const client = await sb();
+    const { data, error } = await client
+      .from('recurring')
+      .select('*')
+      .order('day_of_month');
+    if (error) throw error;
+    return data;
+  },
+
+  async createRecurring(rule) {
+    const client = await sb();
+    const user = await this.requireUser();
+    const { data, error } = await client
+      .from('recurring')
+      .insert({ ...rule, user_id: user.id })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateRecurring(id, patch) {
+    const client = await sb();
+    const { data, error } = await client
+      .from('recurring')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteRecurring(id) {
+    const client = await sb();
+    const { error } = await client.from('recurring').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async restoreAll() {
+    throw new Error('Restore is only available in local mode. Use CSV import instead.');
+  },
+
   async listTransactions(filters = {}) {
     const client = await sb();
     let q = client.from('transactions').select('*').order('date', { ascending: false });
@@ -143,7 +196,7 @@ const supabaseBackend = {
 
   async createTransaction(tx) {
     const client = await sb();
-    const user = await this.getCurrentUser();
+    const user = await this.requireUser();
     const { data, error } = await client
       .from('transactions')
       .insert({ ...tx, user_id: user.id })
@@ -155,7 +208,7 @@ const supabaseBackend = {
 
   async createTransactionsBulk(txs) {
     const client = await sb();
-    const user = await this.getCurrentUser();
+    const user = await this.requireUser();
     const rows = txs.map((t) => ({ ...t, user_id: user.id }));
     const { data, error } = await client.from('transactions').insert(rows).select();
     if (error) throw error;
@@ -184,7 +237,7 @@ const supabaseBackend = {
     const existing = await this.listCategories();
     if (existing.length) return existing;
     const client = await sb();
-    const user = await this.getCurrentUser();
+    const user = await this.requireUser();
     const rows = DEFAULT_CATEGORIES.map((c) => ({
       ...c,
       user_id: user.id,
@@ -203,6 +256,7 @@ const supabaseBackend = {
 // =============================================================================
 const LS_TX = 'pb_local_transactions';
 const LS_CAT = 'pb_local_categories';
+const LS_REC = 'pb_local_recurring';
 
 function lsRead(key) {
   try {
@@ -256,6 +310,32 @@ const localBackend = {
     lsWrite(LS_CAT, lsRead(LS_CAT).filter((c) => c.id !== id));
   },
 
+  // --- recurring rules -------------------------------------------------------
+  async listRecurring() {
+    return lsRead(LS_REC).sort((a, b) => a.day_of_month - b.day_of_month);
+  },
+
+  async createRecurring(rule) {
+    const rules = lsRead(LS_REC);
+    const row = { id: uid(), created_at: new Date().toISOString(), ...rule, user_id: 'local-user' };
+    rules.push(row);
+    lsWrite(LS_REC, rules);
+    return row;
+  },
+
+  async updateRecurring(id, patch) {
+    const rules = lsRead(LS_REC);
+    const i = rules.findIndex((r) => r.id === id);
+    if (i === -1) throw new Error('Recurring rule not found');
+    rules[i] = { ...rules[i], ...patch };
+    lsWrite(LS_REC, rules);
+    return rules[i];
+  },
+
+  async deleteRecurring(id) {
+    lsWrite(LS_REC, lsRead(LS_REC).filter((r) => r.id !== id));
+  },
+
   async listTransactions(filters = {}) {
     let rows = lsRead(LS_TX);
     if (filters.from) rows = rows.filter((r) => r.date >= filters.from);
@@ -298,6 +378,14 @@ const localBackend = {
 
   async deleteTransaction(id) {
     lsWrite(LS_TX, lsRead(LS_TX).filter((r) => r.id !== id));
+  },
+
+  // Replace ALL local data with a JSON backup (export from the Categories
+  // page). Local mode only — synced accounts restore via CSV import instead.
+  async restoreAll(data) {
+    lsWrite(LS_CAT, Array.isArray(data.categories) ? data.categories : []);
+    lsWrite(LS_TX, Array.isArray(data.transactions) ? data.transactions : []);
+    lsWrite(LS_REC, Array.isArray(data.recurring) ? data.recurring : []);
   },
 
   async seedDefaultCategories() {

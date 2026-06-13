@@ -6,8 +6,22 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "shortcuts": [
+    {
+      "name": "Add transaction",
+      "short_name": "Add",
+      "url": "./index.html#/add",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Reports",
+      "short_name": "Reports",
+      "url": "./index.html#/reports",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "./icons/icon-192.png",

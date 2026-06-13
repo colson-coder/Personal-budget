@@ -10,7 +10,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v1';
+const CACHE_VERSION = 'pb-shell-v3';
 
 const APP_SHELL = [
   './',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './js/db.js',
   './js/router.js',
   './js/rates.js',
+  './js/recurring.js',
   './js/util.js',
   './js/views/auth.js',
   './js/views/dashboard.js',
@@ -29,6 +30,7 @@ const APP_SHELL = [
   './js/views/add.js',
   './js/views/categories.js',
   './js/views/import.js',
+  './js/views/reports.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon-180.png',
