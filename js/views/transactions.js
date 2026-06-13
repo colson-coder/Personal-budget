@@ -23,6 +23,7 @@ export async function renderTransactions() {
     ...categories.map((c) => el('option', { value: c.id }, c.name))]);
   const fCur = el('select', {}, [el('option', { value: '' }, 'All currencies'),
     ...CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c))]);
+  const fSearch = el('input', { type: 'search', placeholder: 'Search description or amount…' });
 
   const listHost = el('div', { class: 'tx-table' });
 
@@ -32,13 +33,25 @@ export async function renderTransactions() {
     if (fTo.value) filters.to = fTo.value;
     if (fCat.value) filters.category_id = fCat.value;
     if (fCur.value) filters.currency = fCur.value;
-    const rows = await db.listTransactions(filters);
+    let rows = await db.listTransactions(filters);
+    // Free-text search: case-insensitive description match, plus exact amount
+    // match when the query parses as a number ("when did I last pay 60?").
+    const q = fSearch.value.trim().toLowerCase();
+    if (q) {
+      const asNum = parseFloat(q);
+      rows = rows.filter((r) =>
+        (r.description || '').toLowerCase().includes(q) ||
+        (!isNaN(asNum) && (Math.abs(Number(r.amount)) === Math.abs(asNum) ||
+                           Math.abs(Number(r.amount_usd)) === Math.abs(asNum))));
+    }
     drawRows(rows);
   }
 
   [fFrom, fTo, fCat, fCur].forEach((c) => c.addEventListener('change', reload));
+  fSearch.addEventListener('input', reload);
 
   const filters = el('div', { class: 'card filters' }, [
+    el('div', { class: 'field filter-search' }, [el('label', {}, 'Search'), fSearch]),
     el('div', { class: 'field' }, [el('label', {}, 'From'), fFrom]),
     el('div', { class: 'field' }, [el('label', {}, 'To'), fTo]),
     el('div', { class: 'field' }, [el('label', {}, 'Category'), fCat]),

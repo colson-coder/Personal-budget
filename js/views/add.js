@@ -9,7 +9,10 @@ import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
 
 export async function renderAdd() {
-  const categories = await db.listCategories();
+  const [categories, history] = await Promise.all([
+    db.listCategories(),
+    db.listTransactions({ limit: 500 }), // for autocomplete + smart suggestions
+  ]);
 
   const root = el('div', { class: 'view view-add' });
   root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Add transaction')]));
@@ -27,7 +30,29 @@ export async function renderAdd() {
       ? categories.map((c) => el('option', { value: c.id }, c.name))
       : [el('option', { value: '' }, 'No categories — add some first')]);
   const dateInput = el('input', { type: 'date', id: 'f-date', value: todayISO(), max: todayISO(), required: 'required' });
-  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Groceries at Auto Mercado' });
+  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Groceries at Auto Mercado', list: 'desc-suggestions', autocomplete: 'off' });
+
+  // Smart entry (Cashew-style "title recognition" — a lookup, not ML):
+  // autocomplete past descriptions, and when one matches, prefill the
+  // category/currency you used for it last time.
+  const pastByDesc = new Map(); // lowercased description → most recent tx
+  for (const t of history) {
+    const k = (t.description || '').trim().toLowerCase();
+    if (k && !pastByDesc.has(k)) pastByDesc.set(k, t); // history is newest-first
+  }
+  const datalist = el('datalist', { id: 'desc-suggestions' },
+    [...pastByDesc.values()].slice(0, 50).map((t) => el('option', { value: t.description })));
+  descInput.addEventListener('input', () => {
+    const match = pastByDesc.get(descInput.value.trim().toLowerCase());
+    if (!match) return;
+    if (match.category_id && [...categorySel.options].some((o) => o.value === match.category_id)) {
+      categorySel.value = match.category_id;
+    }
+    if (CONFIG.CURRENCIES.includes(match.currency)) currencySel.value = match.currency;
+    if (match.type === 'income') typeIncome.checked = true;
+    else typeExpense.checked = true;
+    if (!amountInput.value) amountInput.placeholder = String(match.amount);
+  });
 
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit' }, 'Save transaction');
 
@@ -45,7 +70,7 @@ export async function renderAdd() {
     ]),
     el('div', { class: 'field' }, [el('label', { for: 'f-category' }, 'Category'), categorySel]),
     el('div', { class: 'field' }, [el('label', { for: 'f-date' }, 'Date'), dateInput]),
-    el('div', { class: 'field' }, [el('label', { for: 'f-desc' }, 'Description'), descInput]),
+    el('div', { class: 'field' }, [el('label', { for: 'f-desc' }, 'Description'), descInput, datalist]),
     submitBtn,
   ]);
 

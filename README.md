@@ -30,7 +30,21 @@ devices.
 - **Recurring transactions (auto-tracking)** — set rent, salary, or
   subscriptions once (on the Add page) and the app records them automatically
   every month on their day, catching up any months missed while the app was
-  closed.
+  closed. The dashboard shows what's still **upcoming this month** with a
+  projected month-end balance.
+- **Reports** — "Month in review" digest (spend vs last month, savings rate,
+  largest expense, biggest category movers), a 12-month income-vs-expense
+  chart, and top categories over the last year. All computed client-side,
+  rendered as dependency-free inline SVG.
+- **Budget rollover (envelopes)** — per-category toggle: unspent budget
+  carries into next month, overspending eats into it (YNAB/Actual-style).
+- **Smart fast entry** — description autocomplete from your history that
+  prefills the category and currency you used last time; remembers your
+  last-used currency.
+- **Search** — free-text description search plus exact-amount lookup on the
+  transactions page.
+- **Your data, always** — one-tap JSON backup and CSV export (re-importable);
+  local-mode restores from JSON backups.
 - **Import** — CSV upload with column mapping and a validated preview: flags
   bad dates / unknown currencies, **auto-categorizes by description keywords**
   (UBER → Transport, NETFLIX → Subscriptions…), maps unknown category names to

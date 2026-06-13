@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { db } from '../db.js';
+import { getRate } from '../rates.js';
 import { el, fmtUSD, monthBounds, todayISO, monthLabel, nextMonthYM, prevMonthYM } from '../util.js';
 import { navigate } from '../router.js';
 
@@ -83,12 +84,22 @@ export async function renderDashboard(params = {}) {
   } else {
     for (const c of budgetCats) {
       const spent = spentByCat.get(c.id) || 0;
-      const budget = Number(c.monthly_budget_usd) || 0;
+      const base = Number(c.monthly_budget_usd) || 0;
+      // Envelope rollover (YNAB/Actual-style): unspent budget from previous
+      // months carries forward; overspending eats into this month.
+      const carry = c.rollover ? carryoverUSD(c, allTx, ym) : 0;
+      const budget = base > 0 || carry !== 0 ? Math.max(0, base + carry) : 0;
       const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
-      const over = budget > 0 && spent > budget;
+      const over = budget > 0 ? spent > budget : (c.rollover && base + carry < spent);
       budgetCard.append(el('div', { class: 'budget-row' }, [
         el('div', { class: 'budget-line' }, [
-          el('span', {}, c.name),
+          el('span', {}, [
+            c.name,
+            c.rollover && Math.abs(carry) >= 0.01
+              ? el('span', { class: 'carry ' + (carry >= 0 ? 'pos' : 'neg') },
+                  ` ${carry >= 0 ? '+' : '−'}${fmtUSD(Math.abs(carry))} carried`)
+              : null,
+          ]),
           el('span', { class: over ? 'neg' : 'muted' },
             budget > 0 ? `${fmtUSD(spent)} / ${fmtUSD(budget)}` : fmtUSD(spent)),
         ]),
@@ -102,6 +113,13 @@ export async function renderDashboard(params = {}) {
     }
   }
   root.append(budgetCard);
+
+  // Upcoming recurring bills/income this month + projected month-end balance
+  // (only meaningful when viewing the current month).
+  if (isCurrent) {
+    const upcoming = await upcomingCard(balance, catById);
+    if (upcoming) root.append(upcoming);
+  }
 
   // Recent transactions
   const recent = allTx.slice(0, 5);
@@ -147,5 +165,85 @@ function summaryCard(label, value, tone) {
   return el('div', { class: 'card summary-card' }, [
     el('div', { class: 'summary-label' }, label),
     el('div', { class: 'summary-value ' + (tone || '') }, value),
+  ]);
+}
+
+// Envelope carryover for a rollover category at month `ym`: sum of
+// (monthly budget − spend) over every prior month with activity. Uses the
+// category's current budget for all months (we don't store budget history).
+function carryoverUSD(cat, allTx, ym) {
+  const budget = Number(cat.monthly_budget_usd) || 0;
+  const spentByMonth = new Map();
+  let firstYM = null;
+  for (const t of allTx) {
+    if (t.type !== 'expense' || t.category_id !== cat.id) continue;
+    const m = t.date.slice(0, 7);
+    if (m >= ym) continue;
+    spentByMonth.set(m, (spentByMonth.get(m) || 0) + (Number(t.amount_usd) || 0));
+    if (!firstYM || m < firstYM) firstYM = m;
+  }
+  if (!firstYM) return 0;
+  // Walk every month from first activity up to (not including) the viewed one.
+  let carry = 0;
+  let [y, m] = firstYM.split('-').map(Number);
+  for (;;) {
+    const cur = `${y}-${String(m).padStart(2, '0')}`;
+    if (cur >= ym) break;
+    carry += budget - (spentByMonth.get(cur) || 0);
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return Math.round(carry * 100) / 100;
+}
+
+// "Upcoming this month" card: recurring rules whose day hasn't arrived yet,
+// plus a projected month-end balance. Returns null if there's nothing pending.
+async function upcomingCard(balance, catById) {
+  let rules = [];
+  try { rules = await db.listRecurring(); } catch { return null; }
+
+  const today = todayISO();
+  const ym = today.slice(0, 7);
+  const [yy, mm] = ym.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+
+  const pending = rules
+    .filter((r) => r.active !== false)
+    .map((r) => ({ ...r, day: Math.min(r.day_of_month, lastDay) }))
+    .filter((r) => {
+      const date = `${ym}-${String(r.day).padStart(2, '0')}`;
+      return date > today && (r.last_applied || '') < ym;
+    })
+    .sort((a, b) => a.day - b.day);
+  if (!pending.length) return null;
+
+  // Convert pending amounts to USD with today's (possibly fallback) rate. A
+  // failed rate just omits that row from the projection rather than blocking.
+  let pendingIncome = 0, pendingExpense = 0;
+  const rows = [];
+  for (const r of pending) {
+    let usd = null;
+    try { usd = Number(r.amount) * (await getRate(r.currency, today)); } catch { /* skip */ }
+    if (usd !== null) {
+      if (r.type === 'income') pendingIncome += usd; else pendingExpense += usd;
+    }
+    rows.push(el('div', { class: 'upcoming-row' }, [
+      el('span', { class: 'upcoming-day' }, `${r.day}`),
+      el('div', { class: 'rec-main' }, [
+        el('span', { class: 'rec-desc' }, r.description || catById.get(r.category_id)?.name || 'Recurring'),
+        el('span', { class: 'rec-meta' }, catById.get(r.category_id)?.name ?? '—'),
+      ]),
+      el('span', { class: 'rec-amt ' + (r.type === 'income' ? 'pos' : 'neg') },
+        `${r.type === 'income' ? '+' : '−'}${Number(r.amount).toLocaleString()} ${r.currency}`),
+    ]));
+  }
+
+  const projected = balance + pendingIncome - pendingExpense;
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'card-head' }, [el('h2', {}, 'Upcoming this month')]),
+    ...rows,
+    el('div', { class: 'projection' }, [
+      el('span', { class: 'muted' }, 'Projected balance after these'),
+      el('span', { class: 'stat-value ' + (projected >= 0 ? 'pos' : 'neg') }, fmtUSD(projected)),
+    ]),
   ]);
 }

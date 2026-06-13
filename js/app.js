@@ -13,15 +13,17 @@ import { renderTransactions } from './views/transactions.js';
 import { renderAdd } from './views/add.js';
 import { renderCategories } from './views/categories.js';
 import { renderImport } from './views/import.js';
+import { renderReports } from './views/reports.js';
 import { el, toast } from './util.js';
 
 const app = document.getElementById('app');
 
 const NAV = [
   { path: '/dashboard', label: 'Dashboard', icon: '◧' },
-  { path: '/transactions', label: 'Transactions', icon: '≣' },
+  { path: '/transactions', label: 'Activity', icon: '≣' },
   { path: '/add', label: 'Add', icon: '＋' },
-  { path: '/categories', label: 'Categories', icon: '☰' },
+  { path: '/reports', label: 'Reports', icon: '◔' },
+  { path: '/categories', label: 'Budgets', icon: '☰' },
   { path: '/import', label: 'Import', icon: '↑' },
 ];
 
@@ -95,6 +97,7 @@ function renderShell() {
   defineRoute('/add', renderAdd);
   defineRoute('/categories', renderCategories);
   defineRoute('/import', renderImport);
+  defineRoute('/reports', renderReports);
   setNotFound(renderDashboard);
 
   initRouter(outlet, { onNavigate: highlightNav });

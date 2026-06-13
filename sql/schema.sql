@@ -11,9 +11,14 @@ create table if not exists public.categories (
   user_id           uuid not null references auth.users (id) on delete cascade,
   name              text not null,
   monthly_budget_usd numeric(12,2) not null default 0,
+  rollover          boolean not null default false,  -- envelope carryover
   is_default        boolean not null default false,
   created_at        timestamptz not null default now()
 );
+
+-- Upgrade path for databases created before the rollover column existed.
+alter table public.categories
+  add column if not exists rollover boolean not null default false;
 
 create index if not exists categories_user_idx on public.categories (user_id);
 

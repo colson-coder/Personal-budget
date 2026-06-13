@@ -177,6 +177,10 @@ const supabaseBackend = {
     if (error) throw error;
   },
 
+  async restoreAll() {
+    throw new Error('Restore is only available in local mode. Use CSV import instead.');
+  },
+
   async listTransactions(filters = {}) {
     const client = await sb();
     let q = client.from('transactions').select('*').order('date', { ascending: false });
@@ -374,6 +378,14 @@ const localBackend = {
 
   async deleteTransaction(id) {
     lsWrite(LS_TX, lsRead(LS_TX).filter((r) => r.id !== id));
+  },
+
+  // Replace ALL local data with a JSON backup (export from the Categories
+  // page). Local mode only — synced accounts restore via CSV import instead.
+  async restoreAll(data) {
+    lsWrite(LS_CAT, Array.isArray(data.categories) ? data.categories : []);
+    lsWrite(LS_TX, Array.isArray(data.transactions) ? data.transactions : []);
+    lsWrite(LS_REC, Array.isArray(data.recurring) ? data.recurring : []);
   },
 
   async seedDefaultCategories() {
