@@ -1,6 +1,7 @@
 // =============================================================================
 // service-worker.js — Caches the app shell (HTML/CSS/JS/manifest/icons) so the
-// app loads instantly and opens even on a flaky connection.
+// app opens even offline. Requests go to the network first so every deploy
+// shows up right away; the cache is only the offline fallback.
 //
 // IMPORTANT: We deliberately do NOT cache Supabase or ExchangeRate-API
 // responses — financial data and rates must stay live. Only same-origin static
@@ -10,7 +11,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v8';
+const CACHE_VERSION = 'pb-shell-v9';
 
 const APP_SHELL = [
   './',
@@ -75,18 +76,15 @@ self.addEventListener('fetch', (event) => {
   // Supabase ESM CDN). Let them hit the network directly — data stays live.
   if (url.origin !== self.location.origin) return;
 
-  // Same-origin: cache-first for the static shell, falling back to network and
-  // caching new shell assets as they're requested.
+  // Same-origin: network-first. Users always get the newest version when
+  // online (no stale app after a deploy); the cache is the offline fallback.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-    })
+    fetch(req).then((res) => {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
   );
 });
