@@ -7,6 +7,7 @@ import { db } from './db.js';
 import { CONFIG, DEFAULT_SETTINGS, DEFAULT_CATEGORIES } from './config.js';
 import { simulateFunds, DEFAULT_TAX } from './finance.js';
 import { todayISO } from './util.js';
+import { applyTheme } from './theme.js';
 
 let settings = structuredClone(DEFAULT_SETTINGS);
 
@@ -23,6 +24,7 @@ function merge(base, over) {
 function applyCurrencies() {
   if (settings.base_currency) CONFIG.BASE_CURRENCY = settings.base_currency;
   if (settings.timezone) CONFIG.TIMEZONE = settings.timezone;
+  applyTheme(settings.theme);
   const list = settings.currencies?.length ? settings.currencies : ['USD'];
   // Home currency first, so every dropdown defaults to it.
   const withBase = [CONFIG.BASE_CURRENCY, ...list.filter((c) => c !== CONFIG.BASE_CURRENCY)];

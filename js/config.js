@@ -94,6 +94,7 @@ export const DEFAULT_SETTINGS = {
   currencies: ['USD'],
   base_currency: 'USD',
   timezone: null,                     // null → device timezone
+  theme: 'mono',                      // see js/theme.js
   modules: { plan: true, debts: false, income: false, taxes: false },
   tax: null,                          // null → finance.DEFAULT_TAX
   plan: { start_month: null, rules: [] },

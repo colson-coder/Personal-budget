@@ -194,6 +194,7 @@ export function sparkline(values, { width = 120, height = 32, stroke = 'var(--ac
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'sparkline');
+  svg.setAttribute('preserveAspectRatio', 'none'); // stretch to the card width
   svg.setAttribute('aria-hidden', 'true');
   if (values.length < 2) return svg;
   const min = Math.min(...values), max = Math.max(...values);
@@ -207,6 +208,7 @@ export function sparkline(values, { width = 120, height = 32, stroke = 'var(--ac
   line.setAttribute('stroke-width', '2');
   line.setAttribute('stroke-linejoin', 'round');
   line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('vector-effect', 'non-scaling-stroke');
   svg.append(line);
   return svg;
 }
