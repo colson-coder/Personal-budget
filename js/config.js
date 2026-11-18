@@ -49,28 +49,48 @@ export const SUPPORTED_CURRENCIES = [
   'USD', 'EUR', 'GBP', 'CRC', 'MXN', 'CAD', 'AUD', 'JPY', 'CHF', 'COP', 'BRL', 'INR',
 ];
 
-// Predefined categories seeded on first use. `kind` drives the money plan:
-//   hard   = fixed bills / needs        soft = flexible spending
+// Starter categories for a brand-new user: three obvious ones plus Income.
+// Everything else is one tap away (SUGGESTED_CATEGORIES) on the Budgets page.
+// `kind` drives the money plan:
+//   hard   = bills / fixed costs        soft = everyday spending
 //   debt   = loan & card payments       income = money in
 //   tax    = tax payments (tracked on the Taxes page)
 export const DEFAULT_CATEGORIES = [
-  { name: 'Housing/Rent', kind: 'hard', monthly_budget_usd: 0 },
-  { name: 'Utilities', kind: 'hard', monthly_budget_usd: 0 },
-  { name: 'Subscriptions', kind: 'hard', monthly_budget_usd: 0 },
-  { name: 'Insurance', kind: 'hard', monthly_budget_usd: 0 },
-  { name: 'Food & Dining', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Transport', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Shopping', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Entertainment', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Travel', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Health', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Giving', kind: 'soft', monthly_budget_usd: 0 },
-  { name: 'Debt Payment', kind: 'debt', monthly_budget_usd: 0 },
-  { name: 'Taxes', kind: 'tax', monthly_budget_usd: 0 },
-  { name: 'Income', kind: 'income', monthly_budget_usd: 0 },
-  { name: 'Passive Income', kind: 'income', tax_treatment: 'owed', monthly_budget_usd: 0 },
-  { name: 'Interest', kind: 'income', tax_treatment: 'owed', monthly_budget_usd: 0 },
+  { name: 'Housing & Bills', kind: 'hard', monthly_budget_usd: 0 },
+  { name: 'Food', kind: 'soft', monthly_budget_usd: 0 },
   { name: 'Other', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Income', kind: 'income', monthly_budget_usd: 0 },
+];
+
+// One-tap additions shown on the Budgets page (only ones the user lacks).
+export const SUGGESTED_CATEGORIES = [
+  { name: 'Transport', kind: 'soft' },
+  { name: 'Shopping', kind: 'soft' },
+  { name: 'Entertainment', kind: 'soft' },
+  { name: 'Health', kind: 'soft' },
+  { name: 'Subscriptions', kind: 'hard' },
+  { name: 'Utilities', kind: 'hard' },
+  { name: 'Insurance', kind: 'hard' },
+  { name: 'Phone & Internet', kind: 'hard' },
+  { name: 'Childcare', kind: 'hard' },
+  { name: 'Travel', kind: 'soft' },
+  { name: 'Gifts', kind: 'soft' },
+  { name: 'Giving', kind: 'soft' },
+  { name: 'Pets', kind: 'soft' },
+  { name: 'Education', kind: 'soft' },
+  { name: 'Personal care', kind: 'soft' },
+  { name: 'Side income', kind: 'income', tax_treatment: 'owed' },
+];
+
+// Categories the app creates itself when a feature needs them.
+export const SYSTEM_CATEGORIES = [
+  { name: 'Debt Payment', kind: 'debt' },
+  { name: 'Taxes', kind: 'tax' },
+  { name: 'Passive Income', kind: 'income', tax_treatment: 'owed' },
+  { name: 'Interest', kind: 'income', tax_treatment: 'owed' },
+  // Older default names, so existing users keep the right kinds.
+  { name: 'Housing/Rent', kind: 'hard' },
+  { name: 'Food & Dining', kind: 'soft' },
 ];
 
 export const CATEGORY_KINDS = [

@@ -6,8 +6,8 @@
 // =============================================================================
 
 import { db, isLocalMode, TABLES } from '../db.js';
-import { CATEGORY_KINDS, CONFIG, TAX_TREATMENTS, DEFAULT_CATEGORIES } from '../config.js';
-import { getSettings, kindOf } from '../store.js';
+import { CATEGORY_KINDS, CONFIG, TAX_TREATMENTS, SUGGESTED_CATEGORIES } from '../config.js';
+import { getSettings, kindOf, defaultTreatment } from '../store.js';
 import { carryoverUSD } from './dashboard.js';
 import { el, fmtUSD, toast, todayISO, monthLabel, openSheet, field, progress } from '../util.js';
 import { navigate } from '../router.js';
@@ -106,7 +106,34 @@ export async function renderCategories() {
       ...unused.map((r) => budgetRow(r)),
     ]));
   }
+  root.append(suggestionsCard(cats));
   return root;
+}
+
+// One tap adds a common category; "Custom" opens the full form. Only shows
+// suggestions the user doesn't already have.
+function suggestionsCard(cats) {
+  const have = new Set(cats.map((c) => c.name.toLowerCase()));
+  const missing = SUGGESTED_CATEGORIES.filter((x) => !have.has(x.name.toLowerCase())
+);
+  const chips = el('div', { class: 'chips' }, [
+    ...missing.map((x) => el('button', {
+      class: 'chip', type: 'button', onClick: async (e) => {
+        e.currentTarget.disabled = true;
+        try {
+          await db.createCategory({ name: x.name, kind: x.kind, monthly_budget_usd: 0, ...(x.tax_treatment ? { tax_treatment: x.tax_treatment } : {}) });
+          toast(`${x.name} added`, 'success');
+          refresh();
+        } catch (err) { toast('Could not add: ' + err.message, 'error'); e.currentTarget.disabled = false; }
+      },
+    }, `＋ ${x.name}`)),
+    el('button', { class: 'chip chip-custom', type: 'button', onClick: () => categorySheet(null) }, '＋ Custom…'),
+  ]);
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'card-head' }, [el('h2', {}, 'Add a category')]),
+    el('p', { class: 'muted small hint' }, 'Start simple and add only what you need. To remove one, tap it and choose Delete.'),
+    chips,
+  ]);
 }
 
 function stat(label, value, tone) {
@@ -156,7 +183,7 @@ export function categorySheet(c, onDone = refresh) {
     const kind = el('select', {}, CATEGORY_KINDS.filter((k) => k.value !== 'tax' || s.modules.taxes)
       .map((k) => el('option', { value: k.value, selected: (c ? kindOf(c) : 'soft') === k.value ? 'selected' : null }, k.label)));
     const rollover = el('input', { type: 'checkbox', checked: c?.rollover ? 'checked' : null });
-    const defTreat = DEFAULT_CATEGORIES.find((d) => d.name === c?.name)?.tax_treatment
+    const defTreat = defaultTreatment(c?.name)
       || ((c?.name || '').toLowerCase() === 'income' ? s.tax.main_income : 'owed');
     const treatment = el('select', {}, TAX_TREATMENTS.map((x) => el('option', { value: x.value, selected: (c?.tax_treatment || defTreat) === x.value ? 'selected' : null }, x.label)));
     const deductible = el('input', { type: 'checkbox', checked: c?.tax_deductible ? 'checked' : null });

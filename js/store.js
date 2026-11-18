@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { db } from './db.js';
-import { CONFIG, DEFAULT_SETTINGS, DEFAULT_CATEGORIES } from './config.js';
+import { CONFIG, DEFAULT_SETTINGS, DEFAULT_CATEGORIES, SUGGESTED_CATEGORIES, SYSTEM_CATEGORIES } from './config.js';
 import { simulateFunds, DEFAULT_TAX } from './finance.js';
 import { todayISO } from './util.js';
 import { applyTheme } from './theme.js';
@@ -65,8 +65,10 @@ export async function saveSettings(patch) {
 }
 
 // Category kind with a fallback for categories created before kinds existed.
-const DEFAULT_KIND = new Map(DEFAULT_CATEGORIES.map((c) => [c.name.toLowerCase(), c.kind]));
-const DEFAULT_TREATMENT = new Map(DEFAULT_CATEGORIES.filter((c) => c.tax_treatment).map((c) => [c.name.toLowerCase(), c.tax_treatment]));
+const KNOWN = [...DEFAULT_CATEGORIES, ...SUGGESTED_CATEGORIES, ...SYSTEM_CATEGORIES];
+const DEFAULT_KIND = new Map(KNOWN.map((c) => [c.name.toLowerCase(), c.kind]));
+const DEFAULT_TREATMENT = new Map(KNOWN.filter((c) => c.tax_treatment).map((c) => [c.name.toLowerCase(), c.tax_treatment]));
+export const defaultTreatment = (name) => DEFAULT_TREATMENT.get((name || '').toLowerCase()) || null;
 export function kindOf(cat) {
   if (!cat) return 'soft';
   return cat.kind || DEFAULT_KIND.get((cat.name || '').toLowerCase()) || 'soft';

@@ -117,8 +117,12 @@ export async function renderImport() {
       //   2. keyword auto-categorization from the description (UBER → Transport…)
       //   3. fall back to "Other"
       const matched = byName.get(catNameRaw.toLowerCase());
-      const guessedName = matched ? null : guessCategory(description || catNameRaw);
-      const guessed = guessedName ? byName.get(guessedName.toLowerCase()) : null;
+      // Keyword groups list alternative names ("Food|Food & Dining"); use the
+      // first one this user actually has.
+      const guessedNames = matched ? null : guessCategory(description || catNameRaw);
+      const guessed = guessedNames
+        ? guessedNames.split('|').map((n) => byName.get(n.toLowerCase())).find(Boolean) || null
+        : null;
       const category = matched || guessed || other;
       const categoryMapped = !!catNameRaw && !matched && !guessed;
       const categoryGuessed = !!guessed;
@@ -218,15 +222,15 @@ export async function renderImport() {
 // matching keyword wins; returns a default-category name or null.
 const CATEGORY_KEYWORDS = [
   ['Transport',      ['uber', 'lyft', 'didi', 'taxi', 'gas', 'gasolina', 'fuel', 'parking', 'metro', 'bus ', 'train']],
-  ['Food & Dining',  ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonald', 'grocer', 'supermercado', 'automercado', 'walmart', 'food', 'pizza', 'soda ', 'bakery']],
-  ['Subscriptions',  ['netflix', 'spotify', 'youtube', 'icloud', 'apple.com', 'hbo', 'disney', 'amazon prime', 'subscription', 'openai', 'chatgpt']],
-  ['Utilities',      ['electric', 'water', 'internet', 'phone', 'kolbi', 'claro', 'movistar', 'cable', 'utility', 'ice ']],
-  ['Housing/Rent',   ['rent', 'alquiler', 'mortgage', 'hoa', 'landlord']],
+  ['Food|Food & Dining|Groceries',  ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonald', 'grocer', 'supermercado', 'automercado', 'walmart', 'food', 'pizza', 'soda ', 'bakery']],
+  ['Subscriptions|Entertainment',  ['netflix', 'spotify', 'youtube', 'icloud', 'apple.com', 'hbo', 'disney', 'amazon prime', 'subscription', 'openai', 'chatgpt']],
+  ['Utilities|Phone & Internet|Housing & Bills',      ['electric', 'water', 'internet', 'phone', 'kolbi', 'claro', 'movistar', 'cable', 'utility', 'ice ']],
+  ['Housing & Bills|Housing/Rent|Rent',   ['rent', 'alquiler', 'mortgage', 'hoa', 'landlord']],
   ['Health',         ['pharmacy', 'farmacia', 'doctor', 'clinic', 'hospital', 'dental', 'gym']],
   ['Entertainment',  ['cinema', 'movie', 'concert', 'steam', 'playstation', 'nintendo', 'ticket']],
   ['Travel',         ['airline', 'avianca', 'volaris', 'hotel', 'airbnb', 'booking.com', 'flight']],
   ['Shopping',       ['amazon', 'ebay', 'aliexpress', 'store', 'tienda', 'mall']],
-  ['Income',         ['salary', 'payroll', 'salario', 'deposit from', 'paycheck', 'nomina']],
+  ['Income|Side income',         ['salary', 'payroll', 'salario', 'deposit from', 'paycheck', 'nomina']],
 ];
 
 function guessCategory(text) {
