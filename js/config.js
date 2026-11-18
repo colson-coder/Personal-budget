@@ -18,8 +18,9 @@ export const CONFIG = {
 
   // --- Supabase ---------------------------------------------------------------
   // Fill these in from: Supabase Dashboard → Project Settings → API.
-  SUPABASE_URL: 'https://YOUR-PROJECT-ref.supabase.co',
-  SUPABASE_ANON_KEY: 'YOUR-SUPABASE-ANON-KEY',
+  SUPABASE_URL: 'https://gayrswwxsdgqasnipvzs.supabase.co',
+  // Publishable (public) key — safe to ship; Row-Level Security protects data.
+  SUPABASE_ANON_KEY: 'sb_publishable_qqn3Hn4eydjGNhM7OZK2Mw_MQEgGiZC',
 
   // --- Exchange rates ---------------------------------------------------------
   // ExchangeRate-API is required because our currency list includes CRC, which

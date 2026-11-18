@@ -10,7 +10,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v5';
+const CACHE_VERSION = 'pb-shell-v6';
 
 const APP_SHELL = [
   './',
