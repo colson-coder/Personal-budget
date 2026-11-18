@@ -1,178 +1,249 @@
 // =============================================================================
-// dashboard.js — Total balance (home currency), a month's spend vs budget per category,
-// total spend that month, and the 5 most recent transactions. Use ←/→ to view
-// past months (?month=YYYY-MM query param).
+// dashboard.js — Home: the master board. One screen with everything
+// simplified: this month's money (left to assign, income, spent, set aside)
+// with quick actions (add income, add expense, assign money), then one small
+// tile per area — budgets, funds, debts, taxes, passive income, upcoming
+// bills — each linking to its full page, and recent activity.
+// Use ‹ › to look back at past months (?month=YYYY-MM).
 // =============================================================================
 
 import { db } from '../db.js';
-import { getRate } from '../rates.js';
 import { CONFIG } from '../config.js';
-import { el, fmtUSD, monthBounds, todayISO, monthLabel, nextMonthYM, prevMonthYM } from '../util.js';
-import { navigate } from '../router.js';
 import { loadAll } from '../store.js';
-import { debtLedger, streamLedger } from '../finance.js';
+import { debtLedger, streamLedger, taxSummary } from '../finance.js';
+import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth } from '../util.js';
+import { navigate } from '../router.js';
+import { incomeSheet, assignSheet } from './quick.js';
+import { fundSheet } from './funds.js';
 
 export async function renderDashboard(params = {}) {
-  const [categories, allTx] = await Promise.all([
-    db.listCategories(),
-    db.listTransactions(),
-  ]);
-  const catById = new Map(categories.map((c) => [c.id, c]));
+  const data = await loadAll();
+  const { settings, categories, catById, txs, funds, debts, streams, sim, todayYM } = data;
+  const m = settings.modules;
+  const ym = /^\d{4}-\d{2}$/.test(params.month || '') ? params.month : todayYM;
+  const isCurrent = ym === todayYM;
+  const reload = () => navigate(isCurrent ? '/dashboard' : `/dashboard?month=${ym}`);
 
-  // Which month are we viewing? Defaults to the current CR-calendar month.
-  const thisMonth = todayISO().slice(0, 7);
-  const ym = /^\d{4}-\d{2}$/.test(params.month || '') ? params.month : thisMonth;
-  const isCurrent = ym === thisMonth;
-
-  // Total balance = income USD − expense USD, across all time.
-  let income = 0, expense = 0;
-  for (const t of allTx) {
-    if (t.type === 'income') income += Number(t.amount_usd) || 0;
-    else if (t.type === 'expense') expense += Number(t.amount_usd) || 0; // transfers move money between funds
-  }
-  const balance = income - expense;
-
-  // The viewed month's expenses, grouped by category.
-  const { start, end } = monthBounds(`${ym}-01`);
-  const monthExpenses = allTx.filter(
-    (t) => t.type === 'expense' && t.date >= start && t.date <= end
-  );
-  const spentByCat = new Map();
-  let monthTotal = 0;
-  for (const t of monthExpenses) {
-    const v = Number(t.amount_usd) || 0;
-    monthTotal += v;
-    spentByCat.set(t.category_id, (spentByCat.get(t.category_id) || 0) + v);
-  }
+  const plan = sim.planFor(ym);
+  const s = plan.summary;
+  const spent = s.hard + s.debt + s.soft + (s.tax || 0);
+  const setAside = plan.autoAssigned + plan.manual;
 
   const root = el('div', { class: 'view view-dashboard' });
   root.append(el('div', { class: 'view-head' }, [
-    el('h1', {}, 'Dashboard'),
+    el('h1', {}, settings.name ? `Hi, ${settings.name}` : 'Home'),
     el('div', { class: 'month-nav' }, [
-      el('button', {
-        class: 'icon-btn', title: 'Previous month',
-        onClick: () => navigate(`/dashboard?month=${prevMonthYM(ym)}`),
-      }, '‹'),
+      el('button', { class: 'icon-btn', title: 'Previous month', onClick: () => navigate(`/dashboard?month=${prevMonthYM(ym)}`) }, '‹'),
       el('span', { class: 'month-label' }, monthLabel(ym)),
-      el('button', {
-        class: 'icon-btn', title: 'Next month',
-        disabled: isCurrent ? 'disabled' : null,
-        onClick: () => navigate(`/dashboard?month=${nextMonthYM(ym)}`),
-      }, '›'),
+      el('button', { class: 'icon-btn', title: 'Next month', disabled: isCurrent ? 'disabled' : null, onClick: () => navigate(`/dashboard?month=${nextMonthYM(ym)}`) }, '›'),
     ]),
   ]));
 
-  // Summary cards
-  root.append(el('div', { class: 'grid cards-3' }, [
-    summaryCard('Total balance', fmtUSD(balance), balance >= 0 ? 'pos' : 'neg'),
-    summaryCard('Income (all time)', fmtUSD(income), 'pos'),
-    summaryCard(isCurrent ? 'Spent this month' : `Spent in ${monthLabel(ym)}`, fmtUSD(monthTotal), 'neg'),
-  ]));
-
-  // Adaptive overview: only the features this user turned on.
-  const overview = await overviewStrip(ym);
-  if (overview) root.append(overview);
-
-  // Budgets
-  const budgetCats = categories
-    .filter((c) => Number(c.monthly_budget_usd) > 0 || spentByCat.get(c.id))
-    .sort((a, b) => (spentByCat.get(b.id) || 0) - (spentByCat.get(a.id) || 0));
-
-  const budgetCard = el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [
-      el('h2', {}, isCurrent ? 'Budgets this month' : `Budgets — ${monthLabel(ym)}`),
-      el('a', { class: 'link', href: '#/categories' }, 'Edit'),
+  // --- Hero: this month's money + quick actions ------------------------------------
+  const openAssign = (suggest) => assignSheet({
+    funds, available: plan.leftToAssign, suggest, onDone: reload,
+    onNewFund: () => fundSheet(null, reload),
+  });
+  const hero = el('div', { class: 'card hero-card' }, [
+    el('div', { class: 'hero-main' }, [
+      el('span', { class: 'hero-label' }, m.plan ? 'Left to assign' : 'Left this month'),
+      el('span', { class: 'hero-value ' + ((m.plan ? plan.leftToAssign : s.net) < 0 ? 'neg' : '') },
+        fmtUSD(m.plan ? plan.leftToAssign : s.net)),
+      el('span', { class: 'hero-sub' }, m.plan
+        ? (s.income === 0 && plan.leftToAssign === 0 ? 'Add your income to get started.'
+          : plan.leftToAssign > 0 ? 'Give this money a job — move it into a fund.'
+          : plan.leftToAssign < 0 ? 'You’ve spent or assigned more than came in.' : 'Every dollar has a job. Nice.')
+        : 'Income minus spending'),
     ]),
+    el('div', { class: 'hero-stats' }, [
+      heroStat('Income', fmtUSD(s.income), 'pos'),
+      heroStat('Spent', fmtUSD(spent)),
+      m.plan ? heroStat('Set aside', fmtUSD(setAside)) : null,
+    ]),
+    isCurrent ? el('div', { class: 'hero-actions' }, [
+      el('button', { class: 'btn btn-primary', onClick: () => incomeSheet({ categories: [...catById.values()], onDone: reload, onAssign: (amt) => { reload(); setTimeout(() => openAssignAfter(amt), 350); } }) }, ['＋ ', el('span', {}, 'Income')]),
+      el('button', { class: 'btn', onClick: () => navigate('/add') }, ['＋ ', el('span', {}, 'Expense')]),
+      m.plan ? el('button', { class: 'btn', onClick: () => openAssign() }, [el('span', {}, 'Assign'), el('span', { class: 'wide-only' }, '\u00a0money')]) : null,
+    ]) : null,
   ]);
+  root.append(hero);
 
-  if (!budgetCats.length) {
-    budgetCard.append(el('p', { class: 'muted' },
-      'No budgets set yet. Add budgets on the Categories page.'));
-  } else {
-    for (const c of budgetCats) {
-      const spent = spentByCat.get(c.id) || 0;
-      const base = Number(c.monthly_budget_usd) || 0;
-      // Envelope rollover (YNAB/Actual-style): unspent budget from previous
-      // months carries forward; overspending eats into this month.
-      const carry = c.rollover ? carryoverUSD(c, allTx, ym) : 0;
-      const budget = base > 0 || carry !== 0 ? Math.max(0, base + carry) : 0;
-      const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
-      const over = budget > 0 ? spent > budget : (c.rollover && base + carry < spent);
-      budgetCard.append(el('div', { class: 'budget-row' }, [
-        el('div', { class: 'budget-line' }, [
-          el('span', {}, [
-            c.name,
-            c.rollover && Math.abs(carry) >= 0.01
-              ? el('span', { class: 'carry ' + (carry >= 0 ? 'pos' : 'neg') },
-                  ` ${carry >= 0 ? '+' : '−'}${fmtUSD(Math.abs(carry))} carried`)
-              : null,
-          ]),
-          el('span', { class: over ? 'neg' : 'muted' },
-            budget > 0 ? `${fmtUSD(spent)} / ${fmtUSD(budget)}` : fmtUSD(spent)),
-        ]),
-        el('div', { class: 'progress' }, [
-          el('div', {
-            class: 'progress-bar' + (over ? ' over' : ''),
-            style: `width:${budget > 0 ? pct : 0}%`,
-          }),
-        ]),
-      ]));
-    }
+  // After adding income the board reloads; reopen Assign with fresh numbers.
+  async function openAssignAfter(amount) {
+    const d = await loadAll();
+    const p = d.sim.planFor(d.todayYM);
+    assignSheet({ funds: d.funds, available: p.leftToAssign, suggest: amount, onDone: () => navigate('/dashboard'), onNewFund: () => fundSheet(null, () => navigate('/dashboard')) });
   }
-  root.append(budgetCard);
 
-  // Upcoming recurring bills/income this month + projected month-end balance
-  // (only meaningful when viewing the current month).
+  // --- Tiles -------------------------------------------------------------------------
+  const grid = el('div', { class: 'board-grid' });
+  grid.append(budgetsTile(categories, txs, ym));
+  if (m.plan) grid.append(fundsTile(sim, () => openAssign()));
+  if (m.debts && debts.length) grid.append(debtsTile(debts, txs, todayYM));
+  if (m.taxes) grid.append(taxesTile(data));
+  if (m.income && streams.length) grid.append(incomeTile(streams, txs, todayYM));
   if (isCurrent) {
-    const upcoming = await upcomingCard(balance, catById);
-    if (upcoming) root.append(upcoming);
+    const up = await upcomingTile(catById);
+    if (up) grid.append(up);
   }
-
-  // Recent transactions
-  const recent = allTx.slice(0, 5);
-  const recentCard = el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [
-      el('h2', {}, 'Recent transactions'),
-      el('a', { class: 'link', href: '#/transactions' }, 'View all'),
-    ]),
-  ]);
-  if (!recent.length) {
-    recentCard.append(el('p', { class: 'muted' }, [
-      'No transactions yet. ',
-      el('a', { class: 'link', href: '#/add' }, 'Add your first one'),
-      '.',
-    ]));
-  } else {
-    const list = el('ul', { class: 'tx-list' });
-    for (const t of recent) {
-      const cat = catById.get(t.category_id);
-      list.append(el('li', {
-        class: 'tx-item',
-        onClick: () => navigate('/transactions'),
-      }, [
-        el('div', { class: 'tx-main' }, [
-          el('span', { class: 'tx-desc' }, t.description || (cat?.name ?? 'Transaction')),
-          el('span', { class: 'tx-meta' }, `${cat?.name ?? 'Uncategorized'} · ${t.date}`),
-        ]),
-        el('div', { class: 'tx-amt ' + (t.type === 'income' ? 'pos' : t.type === 'transfer' ? '' : 'neg') }, [
-          (t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0)),
-          el('span', { class: 'tx-orig' },
-            t.currency !== CONFIG.BASE_CURRENCY ? `${Number(t.amount).toLocaleString()} ${t.currency}` : ''),
-        ]),
-      ]));
-    }
-    recentCard.append(list);
-  }
-  root.append(recentCard);
-
+  grid.append(recentTile(txs, catById));
+  root.append(grid);
   return root;
 }
 
-function summaryCard(label, value, tone) {
-  return el('div', { class: 'card summary-card' }, [
-    el('div', { class: 'summary-label' }, label),
-    el('div', { class: 'summary-value ' + (tone || '') }, value),
+function heroStat(label, value, tone) {
+  return el('div', { class: 'hero-stat' }, [
+    el('span', { class: 'hero-stat-label' }, label),
+    el('span', { class: 'hero-stat-value ' + (tone || '') }, value),
   ]);
+}
+
+function tile(title, href, body, cta) {
+  return el('div', { class: 'card board-tile' }, [
+    el('div', { class: 'card-head' }, [
+      el('h2', {}, title),
+      el('a', { class: 'link', href }, cta || 'Open'),
+    ]),
+    ...body,
+  ]);
+}
+
+function lineRow(label, value, tone) {
+  return el('div', { class: 'tile-row' }, [
+    el('span', { class: 'tile-row-label' }, label),
+    el('span', { class: 'tile-row-value ' + (tone || '') }, value),
+  ]);
+}
+
+// --- Budgets -------------------------------------------------------------------------
+function budgetsTile(categories, txs, ym) {
+  const spentBy = new Map();
+  for (const t of txs) {
+    if (t.type !== 'expense' || t.date.slice(0, 7) !== ym) continue;
+    spentBy.set(t.category_id, (spentBy.get(t.category_id) || 0) + (Number(t.amount_usd) || 0));
+  }
+  const rows = categories.map((c) => {
+    const base = Number(c.monthly_budget_usd) || 0;
+    const carry = c.rollover ? carryoverUSD(c, txs, ym) : 0;
+    return { c, budget: base > 0 || carry ? Math.max(0, base + carry) : 0, spent: spentBy.get(c.id) || 0 };
+  }).filter((r) => r.budget > 0);
+  if (!rows.length) {
+    return tile('Budgets', '#/categories', [el('p', { class: 'muted small' }, 'Set a monthly limit for things like food or fun, and see how you’re doing at a glance.')], 'Set budgets');
+  }
+  const budget = rows.reduce((a, r) => a + r.budget, 0);
+  const spent = rows.reduce((a, r) => a + r.spent, 0);
+  const over = rows.filter((r) => r.spent > r.budget);
+  const top = rows.sort((a, b) => b.spent / b.budget - a.spent / a.budget).slice(0, 3);
+  return tile('Budgets', '#/categories', [
+    el('div', { class: 'tile-big' }, [
+      el('span', { class: spent > budget ? 'neg' : '' }, fmtUSD(spent)),
+      el('span', { class: 'muted small' }, ` of ${fmtUSD(budget)}`),
+    ]),
+    progress(spent / budget, { over: spent > budget }),
+    ...top.map((r) => el('div', { class: 'mini-bar-row' }, [
+      el('div', { class: 'tile-row' }, [
+        el('span', { class: 'tile-row-label' }, r.c.name),
+        el('span', { class: 'tile-row-value ' + (r.spent > r.budget ? 'neg' : 'muted') }, `${fmtUSD(r.spent)} / ${fmtUSD(r.budget)}`),
+      ]),
+      progress(r.spent / r.budget, { over: r.spent > r.budget }),
+    ])),
+    over.length ? el('p', { class: 'small neg tile-note' }, `${over.length} categor${over.length === 1 ? 'y is' : 'ies are'} over budget`) : null,
+  ]);
+}
+
+// --- Funds -----------------------------------------------------------------------------
+function fundsTile(sim, onAssign) {
+  if (!sim.funds.length) {
+    return tile('Funds', '#/funds', [el('p', { class: 'muted small' }, 'Pots of money for a purpose — emergency fund, vacation, giving.')], 'Create one');
+  }
+  const top = [...sim.funds].sort((a, b) => b.balance - a.balance).slice(0, 4);
+  return tile('Funds', '#/funds', [
+    el('div', { class: 'tile-big' }, fmtUSD(sim.total)),
+    ...top.map((f) => el('div', { class: 'mini-bar-row' }, [
+      el('div', { class: 'tile-row' }, [
+        el('span', { class: 'tile-row-label' }, f.fund.name),
+        el('span', { class: 'tile-row-value' }, fmtUSD(f.balance)),
+      ]),
+      f.goal > 0 ? progress(f.pctOfGoal) : null,
+    ])),
+    el('button', { class: 'btn btn-sm tile-btn', onClick: onAssign }, 'Assign money'),
+  ]);
+}
+
+// --- Debts -------------------------------------------------------------------------------
+function debtsTile(debts, txs, todayYM) {
+  const day = Number(todayISO().slice(8, 10));
+  const ls = debts.map((d) => ({ d, l: debtLedger(d, txs, todayYM, day) }));
+  const owed = ls.reduce((a, x) => a + x.l.balance, 0);
+  const principal = debts.reduce((a, d) => a + (Number(d.principal) || 0), 0);
+  const soonest = ls.filter((x) => x.l.payoffYM).sort((a, b) => a.l.payoffYM.localeCompare(b.l.payoffYM))[0];
+  return tile('Debts', '#/debts', [
+    el('div', { class: 'tile-big neg' }, fmtUSD(owed)),
+    principal > 0 ? progress(1 - owed / principal) : null,
+    ...ls.slice(0, 3).map((x) => lineRow(x.d.name, fmtUSD(x.l.balance))),
+    soonest ? el('p', { class: 'muted small tile-note' }, `${soonest.d.name} paid off ${shortMonth(soonest.l.payoffYM)}`) : null,
+  ]);
+}
+
+// --- Taxes ---------------------------------------------------------------------------------
+function taxesTile({ settings, txs, catById, sim, todayYM }) {
+  const t = taxSummary({ tax: settings.tax, txs, catById, interestByMonth: sim.interestByMonth, todayYM });
+  return tile(`Taxes · ${t.year.label}`, '#/taxes', [
+    el('div', { class: 'tile-big ' + (t.remaining > 0 ? 'neg' : 'pos') }, fmtUSD(Math.max(0, t.remaining))),
+    el('span', { class: 'muted small' }, t.remaining > 0 ? 'still to pay (estimate)' : 'nothing owed so far'),
+    lineRow('Set aside each month', fmtUSD(t.suggestedMonthly)),
+    lineRow('Paid this year', fmtUSD(t.paid)),
+  ]);
+}
+
+// --- Passive income --------------------------------------------------------------------------
+function incomeTile(streams, txs, todayYM) {
+  const ls = streams.map((s) => ({ s, l: streamLedger(s, txs, todayYM) }));
+  return tile('Passive income', '#/income', [
+    el('div', { class: 'tile-big pos' }, fmtUSD(ls.reduce((a, x) => a + x.l.thisMonth, 0))),
+    el('span', { class: 'muted small' }, 'this month'),
+    ...ls.slice(0, 3).map((x) => lineRow(x.s.name, `${fmtUSD(x.l.last12)} / yr`)),
+  ]);
+}
+
+// --- Upcoming bills ------------------------------------------------------------------------------
+async function upcomingTile(catById) {
+  let rules = [];
+  try { rules = await db.listRecurring(); } catch { return null; }
+  const today = todayISO();
+  const ym = today.slice(0, 7);
+  const [yy, mm] = ym.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const pending = rules
+    .filter((r) => r.active !== false)
+    .map((r) => ({ ...r, day: Math.min(r.day_of_month, lastDay) }))
+    .filter((r) => `${ym}-${String(r.day).padStart(2, '0')}` > today && (r.last_applied || '') < ym)
+    .sort((a, b) => a.day - b.day);
+  if (!pending.length) return null;
+  return tile('Coming up', '#/add', pending.slice(0, 4).map((r) => el('div', { class: 'tile-row' }, [
+    el('span', { class: 'tile-row-label' }, [el('span', { class: 'upcoming-day sm' }, String(r.day)), ' ', r.description || catById.get(r.category_id)?.name || 'Recurring']),
+    el('span', { class: 'tile-row-value ' + (r.type === 'income' ? 'pos' : '') }, `${r.type === 'income' ? '+' : '−'}${Number(r.amount).toLocaleString()} ${r.currency}`),
+  ])), 'Manage');
+}
+
+// --- Recent activity -------------------------------------------------------------------------------
+function recentTile(txs, catById) {
+  const recent = txs.slice(0, 6);
+  if (!recent.length) {
+    return tile('Recent activity', '#/transactions', [el('p', { class: 'muted small' }, 'Nothing yet — add your income or first expense above.')]);
+  }
+  return tile('Recent activity', '#/transactions', recent.map((t) => {
+    const sign = t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−';
+    const tone = t.type === 'income' ? 'pos' : '';
+    const label = t.description || catById.get(t.category_id)?.name || (t.type === 'transfer' ? 'Assigned to fund' : 'Transaction');
+    return el('div', { class: 'tile-row' }, [
+      el('span', { class: 'tile-row-label' }, [label, el('span', { class: 'muted small block' }, `${catById.get(t.category_id)?.name ?? (t.type === 'transfer' ? 'Transfer' : '')} · ${t.date.slice(5)}`)]),
+      el('span', { class: 'tile-row-value ' + tone }, [
+        sign + fmtUSD(Math.abs(Number(t.amount_usd) || 0)),
+        t.currency !== CONFIG.BASE_CURRENCY ? el('span', { class: 'muted small block' }, `${Number(t.amount).toLocaleString()} ${t.currency}`) : null,
+      ]),
+    ]);
+  }), 'All');
 }
 
 // Envelope carryover for a rollover category at month `ym`: sum of
@@ -190,7 +261,6 @@ export function carryoverUSD(cat, allTx, ym) {
     if (!firstYM || m < firstYM) firstYM = m;
   }
   if (!firstYM) return 0;
-  // Walk every month from first activity up to (not including) the viewed one.
   let carry = 0;
   let [y, m] = firstYM.split('-').map(Number);
   for (;;) {
@@ -200,83 +270,4 @@ export function carryoverUSD(cat, allTx, ym) {
     m++; if (m > 12) { m = 1; y++; }
   }
   return Math.round(carry * 100) / 100;
-}
-
-// "Upcoming this month" card: recurring rules whose day hasn't arrived yet,
-// plus a projected month-end balance. Returns null if there's nothing pending.
-async function upcomingCard(balance, catById) {
-  let rules = [];
-  try { rules = await db.listRecurring(); } catch { return null; }
-
-  const today = todayISO();
-  const ym = today.slice(0, 7);
-  const [yy, mm] = ym.split('-').map(Number);
-  const lastDay = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
-
-  const pending = rules
-    .filter((r) => r.active !== false)
-    .map((r) => ({ ...r, day: Math.min(r.day_of_month, lastDay) }))
-    .filter((r) => {
-      const date = `${ym}-${String(r.day).padStart(2, '0')}`;
-      return date > today && (r.last_applied || '') < ym;
-    })
-    .sort((a, b) => a.day - b.day);
-  if (!pending.length) return null;
-
-  // Convert pending amounts to USD with today's (possibly fallback) rate. A
-  // failed rate just omits that row from the projection rather than blocking.
-  let pendingIncome = 0, pendingExpense = 0;
-  const rows = [];
-  for (const r of pending) {
-    let usd = null;
-    try { usd = Number(r.amount) * (await getRate(r.currency, today)); } catch { /* skip */ }
-    if (usd !== null) {
-      if (r.type === 'income') pendingIncome += usd; else pendingExpense += usd;
-    }
-    rows.push(el('div', { class: 'upcoming-row' }, [
-      el('span', { class: 'upcoming-day' }, `${r.day}`),
-      el('div', { class: 'rec-main' }, [
-        el('span', { class: 'rec-desc' }, r.description || catById.get(r.category_id)?.name || 'Recurring'),
-        el('span', { class: 'rec-meta' }, catById.get(r.category_id)?.name ?? '—'),
-      ]),
-      el('span', { class: 'rec-amt ' + (r.type === 'income' ? 'pos' : 'neg') },
-        `${r.type === 'income' ? '+' : '−'}${Number(r.amount).toLocaleString()} ${r.currency}`),
-    ]));
-  }
-
-  const projected = balance + pendingIncome - pendingExpense;
-  return el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [el('h2', {}, 'Upcoming this month')]),
-    ...rows,
-    el('div', { class: 'projection' }, [
-      el('span', { class: 'muted' }, 'Projected balance after these'),
-      el('span', { class: 'stat-value ' + (projected >= 0 ? 'pos' : 'neg') }, fmtUSD(projected)),
-    ]),
-  ]);
-}
-
-async function overviewStrip(ym) {
-  const d = await loadAll();
-  const m = d.settings.modules;
-  const tiles = [];
-  const tile = (label, value, href, tone) => el('a', { class: 'card summary-card ov-tile', href }, [
-    el('div', { class: 'summary-label' }, label),
-    el('div', { class: 'summary-value ' + (tone || '') }, value),
-  ]);
-  if (m.plan) {
-    tiles.push(tile('Saved in funds', fmtUSD(d.sim.total), '#/funds', 'pos'));
-    const p = d.sim.planFor(ym);
-    if (p.lines.length) tiles.push(tile('Left unassigned', fmtUSD(p.unallocated), `#/plan?month=${ym}`, p.unallocated < 0 ? 'neg' : ''));
-  }
-  if (m.debts && d.debts.length) {
-    const day = Number(todayISO().slice(8, 10));
-    const owed = d.debts.reduce((a, x) => a + debtLedger(x, d.txs, d.todayYM, day).balance, 0);
-    tiles.push(tile('Debt remaining', fmtUSD(owed), '#/debts', 'neg'));
-  }
-  if (m.income && d.streams.length) {
-    const inc = d.streams.reduce((a, x) => a + streamLedger(x, d.txs, d.todayYM).thisMonth, 0);
-    tiles.push(tile('Passive income this month', fmtUSD(inc), '#/income', 'pos'));
-  }
-  if (!tiles.length) return null;
-  return el('div', { class: 'grid cards-ov' }, tiles);
 }

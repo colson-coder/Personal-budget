@@ -141,7 +141,7 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
     if (ym >= start) {
       const summary = monthSummary(ym, txs, catById);
       const plan = allocate(summary, rules, fundsById, startBal);
-      plans.set(ym, { summary, ...plan });
+      plans.set(ym, withManual({ summary, ...plan }, ym, txs));
       for (const l of plan.lines) {
         if (delta[l.fund_id]) { delta[l.fund_id].alloc += l.amount; bal[l.fund_id] += l.amount; }
       }
@@ -199,9 +199,21 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
       // Months outside the simulated window (future, or before plan start):
       // compute a standalone plan using current balances.
       const summary = monthSummary(ym, txs, catById);
-      return { summary, ...allocate(summary, rules, fundsById, { ...bal }) };
+      return withManual({ summary, ...allocate(summary, rules, fundsById, { ...bal }) }, ym, txs);
     },
   };
+}
+
+// Money the user moved into funds by hand this month ("Assign money"). It
+// comes out of what's left to assign; the plan's automatic split doesn't.
+export function manualAssigned(ym, txs) {
+  return r2(txs.filter((t) => t.type === 'transfer' && t.fund_id && ymOf(t) === ym)
+    .reduce((a, t) => a + usd(t), 0));
+}
+function withManual(plan, ym, txs) {
+  const manual = manualAssigned(ym, txs);
+  const auto = r2(plan.lines.reduce((a, l) => a + l.amount, 0));
+  return { ...plan, manual, autoAssigned: auto, leftToAssign: r2(plan.unallocated - manual) };
 }
 
 // 'auto' = estimate from APY · 'manual' = user logs actual interest · 'none' = cash

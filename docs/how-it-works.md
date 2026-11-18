@@ -9,10 +9,16 @@ works in any currency.
 
 ## Pages
 
-**Home** — Your month at a glance: total balance, how much you've spent,
-tiles for the features you use (money in funds, debt left, money not yet
-assigned), budget progress, and your latest transactions. Use ‹ › to look at
-past months.
+**Home** — Your master board. The big number is **Left to assign**: money
+that came in this month that doesn't have a job yet (after spending and your
+plan rules). Three buttons:
+- **＋ Income** — add money in seconds, like a side hustle. It's tagged as side
+  income (so the Taxes page counts it) and then offers to assign it.
+- **＋ Expense** — opens the full Add form.
+- **Assign money** — move any amount into a fund you choose (quick 25% / 50%
+  / All buttons).
+Below, one tile per area — Budgets, Funds, Debts, Taxes, Passive income,
+Coming up, Recent activity — each opens its full page. Use ‹ › for past months.
 
 **Activity** — Every transaction. Search by description or amount, filter by
 date, category or currency, and tap ✎ to fix a mistake.
