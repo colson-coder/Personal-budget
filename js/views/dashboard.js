@@ -178,7 +178,7 @@ function summaryCard(label, value, tone) {
 // Envelope carryover for a rollover category at month `ym`: sum of
 // (monthly budget − spend) over every prior month with activity. Uses the
 // category's current budget for all months (we don't store budget history).
-function carryoverUSD(cat, allTx, ym) {
+export function carryoverUSD(cat, allTx, ym) {
   const budget = Number(cat.monthly_budget_usd) || 0;
   const spentByMonth = new Map();
   let firstYM = null;
