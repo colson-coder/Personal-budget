@@ -9,7 +9,7 @@ import { sortRules } from '../finance.js';
 import { fundSheet } from './funds.js';
 import { dataCard } from './categories.js';
 import { THEMES } from '../theme.js';
-import { el, toast, field } from '../util.js';
+import { el, toast, field, fmtUSD } from '../util.js';
 import { navigate } from '../router.js';
 
 const METHODS = [
@@ -139,31 +139,67 @@ function planCard(s, funds) {
 
   const fundOptions = (sel) => funds.map((f) => el('option', { value: f.id, selected: f.id === sel ? 'selected' : null }, f.name));
 
+  // Each rule: Fund · [$ | %] · amount · (for %) "of" what · (for "what's
+  // left") a different % once the fund's goal is reached. A short sentence
+  // under each rule reads it back in plain words.
+  const BASES = METHODS.filter((m) => m.value !== 'fixed');
+  const lastBasis = new Map(); // remember the % basis when toggling to $ and back
+
   function drawRules() {
     list.replaceChildren(...rules.map((r, idx) => {
+      const isFixed = r.method === 'fixed';
       const fund = el('select', {}, fundOptions(r.fund_id));
-      const method = el('select', {}, METHODS.map((m) => el('option', { value: m.value, selected: m.value === r.method ? 'selected' : null }, m.label)));
-      const value = el('input', { type: 'number', step: 'any', min: '0', inputmode: 'decimal', value: r.value ?? '' });
+      fund.addEventListener('change', () => { r.fund_id = fund.value; drawRules(); });
+
+      const unit = el('div', { class: 'unit-toggle', role: 'group', 'aria-label': 'Dollar amount or percent' }, [
+        el('button', { type: 'button', class: isFixed ? 'on' : '', 'aria-pressed': isFixed ? 'true' : 'false', onClick: () => {
+          if (isFixed) return;
+          lastBasis.set(r, r.method); r.method = 'fixed'; drawRules();
+        } }, CONFIG.BASE_CURRENCY === 'USD' ? '$' : CONFIG.BASE_CURRENCY),
+        el('button', { type: 'button', class: !isFixed ? 'on' : '', 'aria-pressed': !isFixed ? 'true' : 'false', onClick: () => {
+          if (!isFixed) return;
+          r.method = lastBasis.get(r) || 'percent_net'; drawRules();
+        } }, '%'),
+      ]);
+
+      const value = el('input', { type: 'number', step: 'any', min: '0', inputmode: 'decimal', value: r.value ?? '',
+        placeholder: isFixed ? '0.00' : '0', 'aria-label': isFixed ? 'Amount' : 'Percent' });
+      const readout = el('p', { class: 'rule-readout muted small' });
+      value.addEventListener('input', () => { r.value = parseFloat(value.value) || 0; readout.textContent = sentence(r); });
+
+      const basis = el('select', {}, BASES.map((m) => el('option', { value: m.value, selected: m.value === r.method ? 'selected' : null }, m.label.replace('% of ', ''))));
+      basis.addEventListener('change', () => { r.method = basis.value; drawRules(); });
+
       const after = el('input', { type: 'number', step: 'any', min: '0', inputmode: 'decimal', value: r.value_after_goal ?? '', placeholder: 'same' });
-      const afterField = field('After goal %', after);
-      const sync = () => {
-        afterField.style.display = method.value === 'percent_remainder' ? '' : 'none';
-        value.placeholder = method.value === 'fixed' ? CONFIG.BASE_CURRENCY : '%';
-      };
-      fund.addEventListener('change', () => { r.fund_id = fund.value; });
-      method.addEventListener('change', () => { r.method = method.value; sync(); });
-      value.addEventListener('input', () => { r.value = parseFloat(value.value) || 0; });
-      after.addEventListener('input', () => { r.value_after_goal = after.value === '' ? null : parseFloat(after.value); });
-      sync();
+      after.addEventListener('input', () => { r.value_after_goal = after.value === '' ? null : parseFloat(after.value); readout.textContent = sentence(r); });
+
+      readout.textContent = sentence(r);
       return el('div', { class: 'rule-row' }, [
         field('Fund', fund),
-        field('How much', method),
-        field(method.value === 'fixed' ? 'Amount' : 'Percent', value),
-        afterField,
+        el('div', { class: 'field' }, [
+          el('label', {}, 'Set aside'),
+          el('div', { class: 'amount-combo' }, [unit, value]),
+        ]),
+        isFixed ? el('div', { class: 'field rule-every' }, [el('label', {}, '\u00a0'), el('span', { class: 'muted' }, 'every month')])
+          : field('Of', basis),
+        r.method === 'percent_remainder' ? field('% after goal is reached', after) : null,
+        readout,
         el('button', { class: 'icon-btn rule-del', title: 'Remove rule', onClick: () => { rules.splice(idx, 1); drawRules(); } }, '✕'),
       ]);
     }));
     if (!rules.length) list.append(el('p', { class: 'muted small' }, 'No rules yet. Add one below.'));
+  }
+
+  function sentence(r) {
+    const name = funds.find((f) => f.id === r.fund_id)?.name || 'this fund';
+    const v = Number(r.value) || 0;
+    if (r.method === 'fixed') return `${fmtUSD(v)} goes to ${name} every month you have income.`;
+    const of = { percent_income: 'all your income', percent_net: 'your net income (after bills and spending)', percent_remainder: 'what’s left after the rules above' }[r.method];
+    let t = `${v}% of ${of} goes to ${name}.`;
+    if (r.method === 'percent_remainder' && r.value_after_goal !== null && r.value_after_goal !== undefined && r.value_after_goal !== '') {
+      t += ` Once it reaches its goal: ${r.value_after_goal}%.`;
+    }
+    return t;
   }
   drawRules();
 

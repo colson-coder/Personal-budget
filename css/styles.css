@@ -807,3 +807,20 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
 .budget-group.unused[open] > summary h2::before { content: '▾ '; }
 .unused-hint { padding: 0 1.15rem 0.4rem; margin: 0; }
 .budget-summary .bs-row { gap: 1rem; }
+
+/* --- Money plan rule editor: $ / % switch ------------------------------------------ */
+.amount-combo { display: flex; gap: 0.4rem; align-items: stretch; }
+.amount-combo input { flex: 1; min-width: 0; }
+.unit-toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; }
+.unit-toggle button {
+  min-width: 2.6rem; min-height: 44px; border: 0; background: transparent; color: var(--text-dim);
+  font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.unit-toggle button + button { border-left: 1px solid var(--border-strong); }
+.unit-toggle button.on { background: var(--primary-bg); color: var(--primary-ink); }
+.rule-every { display: flex; flex-direction: column; justify-content: flex-end; }
+.rule-every > span { min-height: 44px; display: flex; align-items: center; }
+.rule-readout { grid-column: 1 / -1; margin: 0.1rem 0 0; }
+@media (min-width: 768px) {
+  .rule-row { grid-template-columns: 1.1fr 1.2fr 1fr 0.9fr; }
+}
