@@ -11,7 +11,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v10';
+const CACHE_VERSION = 'pb-shell-v11';
 
 const APP_SHELL = [
   './',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './js/config.js',
   './js/db.js',
   './js/finance.js',
+  './js/importer.js',
   './js/icons.js',
   './js/nav.js',
   './js/rates.js',

@@ -872,3 +872,34 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
   .hero-actions .btn { font-size: 0.88rem; padding: 0 0.4rem; }
   .wide-only { display: none; }
 }
+
+/* --- Import --------------------------------------------------------------------- */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  padding: 1.6rem 1rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+  cursor: pointer; text-align: center; color: var(--text); font-weight: 600; margin: 0.4rem 0 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.file-drop:hover { border-color: var(--accent); background: var(--accent-glow); }
+.file-drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.imp-list { display: flex; flex-direction: column; margin: 0.6rem 0 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); max-height: 60vh; overflow-y: auto; }
+.imp-row {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "box main amt" "box cat cat";
+  gap: 0.35rem 0.75rem; align-items: center; padding: 0.7rem 0.8rem; margin: 0;
+  border-top: 1px solid var(--border); color: var(--text); cursor: pointer; font-weight: 400;
+}
+.imp-row:first-child { border-top: 0; }
+.imp-row > input { grid-area: box; width: auto; min-height: auto; accent-color: var(--accent); }
+.imp-row.dup { opacity: 0.7; }
+.imp-row.bad { opacity: 0.55; }
+.imp-main { grid-area: main; display: flex; flex-direction: column; min-width: 0; }
+.imp-desc { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imp-meta { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
+.imp-cat-wrap { grid-area: cat; display: flex; gap: 0.4rem; align-items: center; }
+.imp-cat { min-height: 36px; padding-top: 0.3rem; padding-bottom: 0.3rem; font-size: 0.88rem; max-width: 220px; }
+.imp-amt { grid-area: amt; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag-dim { background: var(--bg-elev-2); color: var(--text-dim); }
+@media (min-width: 768px) {
+  .imp-row { grid-template-columns: auto 1fr 260px 120px; grid-template-areas: "box main cat amt"; }
+  .imp-amt { text-align: right; }
+}
