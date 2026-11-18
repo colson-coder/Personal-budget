@@ -35,7 +35,11 @@ function guessCurrency() {
 }
 
 function timezones() {
-  try { return Intl.supportedValuesOf('timeZone'); } catch { return [CONFIG.TIMEZONE]; }
+  let list = [];
+  try { list = Intl.supportedValuesOf('timeZone'); } catch { /* old browsers */ }
+  // Some devices report a zone (e.g. "UTC") that isn't in the list — keep it.
+  const device = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  return list.includes(device) ? list : [device, ...list];
 }
 
 export function renderSetup(onDone) {

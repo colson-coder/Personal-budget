@@ -95,9 +95,10 @@ function fundCard(f, data) {
   }
 
   const hist = f.history.slice(-12).map((h) => h.end);
-  if (hist.length > 1) card.append(sparkline(hist, { width: 260, height: 36 }));
+  // Only draw the trend when the balance actually moved.
+  if (hist.length > 1 && Math.max(...hist) - Math.min(...hist) > 0.005) card.append(sparkline(hist, { width: 260, height: 36 }));
 
-  if (tm) {
+  if (tm && (tm.alloc + tm.added > 0 || tm.spent > 0)) {
     card.append(el('div', { class: 'fund-month' }, [
       chip('+' + fmtUSD(tm.alloc + tm.added), 'from plan & deposits this month', 'pos'),
       chip('−' + fmtUSD(tm.spent), `${spentLabel} this month`, tm.spent ? 'neg' : 'muted'),

@@ -8,6 +8,7 @@ import { getSettings, saveSettings, loadAll } from '../store.js';
 import { sortRules } from '../finance.js';
 import { fundSheet } from './funds.js';
 import { dataCard } from './categories.js';
+import { THEMES } from '../theme.js';
 import { el, toast, field } from '../util.js';
 import { navigate } from '../router.js';
 
@@ -24,6 +25,7 @@ export async function renderSettings(params = {}) {
   const root = el('div', { class: 'view view-settings' });
   root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Settings')]));
 
+  root.append(appearanceCard(s));
   root.append(profileCard(s, txs.length > 0));
   root.append(featuresCard(s));
   if (s.modules.plan) {
@@ -43,12 +45,34 @@ export async function renderSettings(params = {}) {
   return root;
 }
 
+function appearanceCard(s) {
+  const grid = el('div', { class: 'theme-grid' });
+  const draw = (current) => grid.replaceChildren(...THEMES.map((t) => el('button', {
+    class: 'theme-opt' + (t.value === current ? ' on' : ''), type: 'button', 'aria-pressed': t.value === current ? 'true' : 'false',
+    onClick: async () => {
+      draw(t.value);
+      await saveSettings({ theme: t.value }); // applies instantly via store
+      toast(`${t.label} theme on`, 'success');
+    },
+  }, [
+    el('span', { class: 'theme-swatch', style: `background:${t.swatch[0]};border:1px solid var(--border)` }, [
+      el('i', { style: `width:45%;background:${t.swatch[1]}` }),
+      el('i', { style: `width:25%;background:${t.swatch[2]}` }),
+    ]),
+    el('span', { class: 'theme-name' }, t.label),
+    el('span', { class: 'theme-desc' }, t.desc),
+  ])));
+  draw(s.theme || 'mono');
+  return el('div', { class: 'card' }, [el('h2', {}, 'Appearance'), grid]);
+}
+
 function profileCard(s, hasData) {
   const name = el('input', { type: 'text', value: s.name || '', placeholder: 'optional' });
   const base = el('select', { disabled: hasData ? 'disabled' : null }, SUPPORTED_CURRENCIES.map((c) =>
     el('option', { value: c, selected: c === CONFIG.BASE_CURRENCY ? 'selected' : null }, c)));
   let zones;
-  try { zones = Intl.supportedValuesOf('timeZone'); } catch { zones = [CONFIG.TIMEZONE]; }
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch { zones = []; }
+  if (!zones.includes(CONFIG.TIMEZONE)) zones = [CONFIG.TIMEZONE, ...zones];
   const tz = el('select', {}, zones.map((z) => el('option', { value: z, selected: z === CONFIG.TIMEZONE ? 'selected' : null }, z.replace(/_/g, ' '))));
   const chosen = new Set(CONFIG.CURRENCIES);
   const chips = el('div', { class: 'chips' });
