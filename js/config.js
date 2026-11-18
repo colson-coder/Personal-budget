@@ -74,8 +74,8 @@ export const DEFAULT_CATEGORIES = [
 ];
 
 export const CATEGORY_KINDS = [
-  { value: 'hard', label: 'Fixed bill' },
-  { value: 'soft', label: 'Flexible' },
+  { value: 'hard', label: 'Bill (fixed cost)' },
+  { value: 'soft', label: 'Everyday spending' },
   { value: 'debt', label: 'Debt payment' },
   { value: 'tax', label: 'Tax payment' },
   { value: 'income', label: 'Income' },

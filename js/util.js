@@ -161,7 +161,9 @@ export function openSheet(title, build) {
   document.body.append(backdrop);
   requestAnimationFrame(() => {
     backdrop.classList.add('open');
-    panel.querySelector('input, select')?.focus({ preventScroll: true });
+    // Auto-focus only with a mouse/trackpad — on phones it would pop the
+    // keyboard over the sheet before the user chose a field.
+    if (matchMedia('(pointer: fine)').matches) panel.querySelector('input, select')?.focus({ preventScroll: true });
   });
   return close;
 }

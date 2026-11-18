@@ -1,110 +1,219 @@
 // =============================================================================
-// categories.js — Categories & Budgets. Editable list with monthly USD budgets.
-// Add / edit / delete.
+// categories.js — Budgets. A simple grouped list (Bills, Everyday spending,
+// Debt payments, Taxes, Income): each row shows this month's spending against
+// its budget. Tap a row to edit; advanced options (type, rollover, tax) live
+// in the edit sheet, not on every row.
 // =============================================================================
 
 import { db, isLocalMode, TABLES } from '../db.js';
 import { CATEGORY_KINDS, CONFIG, TAX_TREATMENTS, DEFAULT_CATEGORIES } from '../config.js';
-import { getSettings } from '../store.js';
-import { kindOf } from '../store.js';
-import { el, fmtUSD, toast } from '../util.js';
+import { getSettings, kindOf } from '../store.js';
+import { carryoverUSD } from './dashboard.js';
+import { el, fmtUSD, toast, todayISO, monthLabel, openSheet, field, progress } from '../util.js';
+import { navigate } from '../router.js';
+
+const GROUPS = [
+  { kind: 'hard', title: 'Bills', hint: 'Fixed costs: rent, utilities, subscriptions' },
+  { kind: 'soft', title: 'Everyday spending', hint: 'Food, transport, shopping, fun' },
+  { kind: 'debt', title: 'Debt payments' },
+  { kind: 'tax', title: 'Taxes', module: 'taxes' },
+  { kind: 'income', title: 'Income' },
+];
+const refresh = () => navigate('/categories');
 
 export async function renderCategories() {
-  const root = el('div', { class: 'view view-categories' });
-  root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Categories & Budgets')]));
-
-  const listHost = el('div', { class: 'card' });
-  root.append(listHost);
-
-  async function reload() {
-    const cats = await db.listCategories();
-    listHost.replaceChildren();
-    if (!cats.length) {
-      listHost.append(el('p', { class: 'muted' }, 'No categories yet.'));
-    }
-    for (const c of cats) listHost.append(catRow(c));
+  const ym = todayISO().slice(0, 7);
+  const [cats, txs] = await Promise.all([db.listCategories(), db.listTransactions()]);
+  const spent = new Map();
+  const received = new Map();
+  for (const t of txs) {
+    if (t.date.slice(0, 7) !== ym) continue;
+    const v = Number(t.amount_usd) || 0;
+    if (t.type === 'expense') spent.set(t.category_id, (spent.get(t.category_id) || 0) + v);
+    else if (t.type === 'income') received.set(t.category_id, (received.get(t.category_id) || 0) + v);
   }
 
-  function catRow(c) {
-    const name = el('input', { type: 'text', value: c.name, class: 'cat-name' });
-    const budget = el('input', { type: 'number', min: '0', step: '1', value: Number(c.monthly_budget_usd) || 0, class: 'cat-budget', inputmode: 'decimal' });
-    // Envelope rollover: unspent budget carries into next month (YNAB-style).
-    const rollover = el('input', { type: 'checkbox', class: 'cat-rollover', checked: c.rollover ? 'checked' : null });
-    const kind = el('select', { class: 'cat-kind', title: 'How this category counts in your plan' },
-      CATEGORY_KINDS.map((k) => el('option', { value: k.value, selected: kindOf(c) === k.value ? 'selected' : null }, k.label)));
-    // Tax controls (only when the Taxes feature is on): how income is taxed,
-    // or whether an expense is deductible.
-    const taxesOn = getSettings().modules.taxes;
-    const defTreat = DEFAULT_CATEGORIES.find((d) => d.name === c.name)?.tax_treatment
-      || (c.name.toLowerCase() === 'income' ? getSettings().tax.main_income : 'owed');
-    const treatment = el('select', { class: 'cat-kind', title: 'How this income is taxed' },
-      TAX_TREATMENTS.map((x) => el('option', { value: x.value, selected: (c.tax_treatment || defTreat) === x.value ? 'selected' : null }, x.label)));
-    const deductible = el('input', { type: 'checkbox', checked: c.tax_deductible ? 'checked' : null });
-    const deductLabel = el('label', { class: 'rollover-label', title: 'Lowers your tax estimate' }, [deductible, 'tax-deductible']);
-    const syncTax = () => {
-      const isIncome = kind.value === 'income';
-      treatment.style.display = taxesOn && isIncome ? '' : 'none';
-      deductLabel.style.display = taxesOn && !isIncome && kind.value !== 'tax' ? '' : 'none';
+  // Effective budget = monthly budget + any rollover carried in.
+  const rows = cats.map((c) => {
+    const base = Number(c.monthly_budget_usd) || 0;
+    const carry = c.rollover ? carryoverUSD(c, txs, ym) : 0;
+    const kind = kindOf(c);
+    return {
+      c, kind, carry,
+      budget: base > 0 || carry !== 0 ? Math.max(0, base + carry) : 0,
+      amount: kind === 'income' ? received.get(c.id) || 0 : spent.get(c.id) || 0,
     };
-    kind.addEventListener('change', syncTax);
-    requestAnimationFrame(syncTax);
+  });
 
-    const row = el('div', { class: 'cat-row' }, [
-      el('div', { class: 'cat-fields' }, [
-        name,
-        el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, CONFIG.BASE_CURRENCY), budget, el('span', { class: 'suffix' }, '/mo')]),
-        kind,
-        treatment,
-        el('label', { class: 'rollover-label', title: 'Unspent budget carries into next month' }, [rollover, 'roll over']),
-        deductLabel,
-      ]),
-      el('div', { class: 'cat-actions' }, [
-        el('button', { class: 'btn btn-sm btn-primary', onClick: async () => {
-          const patch = {
-            name: name.value.trim(),
-            monthly_budget_usd: parseFloat(budget.value) || 0,
-            rollover: rollover.checked,
-            kind: kind.value,
-            ...(taxesOn ? { tax_treatment: kind.value === 'income' ? treatment.value : null, tax_deductible: kind.value !== 'income' && deductible.checked } : {}),
-          };
-          if (!patch.name) return toast('Name cannot be empty', 'error');
-          await db.updateCategory(c.id, patch);
-          toast('Saved', 'success');
-        } }, 'Save'),
-        el('button', { class: 'btn btn-sm btn-ghost', onClick: async () => {
-          if (!confirm(`Delete "${c.name}"? Transactions keep their data but lose this label.`)) return;
-          await db.deleteCategory(c.id);
-          toast('Deleted', 'info');
-          reload();
-        } }, 'Delete'),
-      ]),
-    ]);
-    return row;
-  }
+  const root = el('div', { class: 'view view-categories' });
+  root.append(el('div', { class: 'view-head' }, [
+    el('div', {}, [el('h1', {}, 'Budgets'), el('div', { class: 'muted small' }, monthLabel(ym))]),
+    el('button', { class: 'btn btn-primary btn-sm', onClick: () => categorySheet(null) }, '＋ Category'),
+  ]));
 
-  // Add-new form
-  const newName = el('input', { type: 'text', placeholder: 'New category name' });
-  const newBudget = el('input', { type: 'number', min: '0', step: '1', placeholder: '0', inputmode: 'decimal' });
-  const addCard = el('div', { class: 'card add-cat' }, [
-    el('h2', {}, 'Add category'),
-    el('div', { class: 'cat-fields' }, [
-      newName,
-      el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, CONFIG.BASE_CURRENCY), newBudget, el('span', { class: 'suffix' }, '/mo')]),
+  // --- Summary -----------------------------------------------------------------
+  const out = rows.filter((r) => r.kind !== 'income');
+  const budgeted = out.reduce((a, r) => a + r.budget, 0);
+  const spentTotal = out.reduce((a, r) => a + r.amount, 0);
+  const left = budgeted - spentTotal;
+  const summary = el('div', { class: 'card budget-summary' }, [
+    el('div', { class: 'bs-row' }, [
+      stat('Budgeted', fmtUSD(budgeted)),
+      stat('Spent', fmtUSD(spentTotal)),
+      stat(left >= 0 ? 'Left' : 'Over', fmtUSD(Math.abs(left)), left >= 0 ? 'pos' : 'neg'),
     ]),
-    el('button', { class: 'btn btn-primary', onClick: async () => {
-      const name = newName.value.trim();
-      if (!name) return toast('Enter a name', 'error');
-      await db.createCategory({ name, monthly_budget_usd: parseFloat(newBudget.value) || 0 });
-      newName.value = ''; newBudget.value = '';
-      toast('Category added', 'success');
-      reload();
-    } }, 'Add'),
   ]);
-  root.append(addCard);
-  root.append(dataCard());
+  if (budgeted > 0) summary.append(progress(spentTotal / budgeted, { over: spentTotal > budgeted }));
+  else summary.append(el('p', { class: 'muted small' }, 'Tap a category to give it a monthly budget.'));
+  root.append(summary);
 
-  await reload();
+  // --- Groups --------------------------------------------------------------------
+  // Only categories in use (a budget, or money this month) are listed; the
+  // rest are tucked into one collapsed "Other categories" section.
+  const modules = getSettings().modules;
+  const active = (r) => r.budget > 0 || r.amount > 0;
+  const unused = [];
+  let shownGroups = 0;
+  for (const g of GROUPS) {
+    if (g.module && !modules[g.module]) continue;
+    const all = rows.filter((r) => r.kind === g.kind);
+    unused.push(...all.filter((r) => !active(r)));
+    const list = all.filter(active).sort((a, b) =>
+      (b.budget > 0) - (a.budget > 0) || b.amount - a.amount || a.c.name.localeCompare(b.c.name));
+    if (!list.length) continue;
+    shownGroups++;
+    const gBudget = list.reduce((a, r) => a + r.budget, 0);
+    const gAmount = list.reduce((a, r) => a + r.amount, 0);
+    root.append(el('div', { class: 'card budget-group' }, [
+      el('div', { class: 'bg-head' }, [
+        el('h2', {}, g.title),
+        el('span', { class: 'muted small' }, g.kind === 'income'
+          ? `${fmtUSD(gAmount)} received`
+          : gBudget > 0 ? `${fmtUSD(gAmount)} of ${fmtUSD(gBudget)}` : fmtUSD(gAmount)),
+      ]),
+      ...list.map((r) => budgetRow(r)),
+    ]));
+  }
+  if (unused.length) {
+    unused.sort((a, b) => a.c.name.localeCompare(b.c.name));
+    // Brand-new users have nothing in use yet — show the list open.
+    root.append(el('details', { class: 'card budget-group unused', open: shownGroups === 0 ? 'open' : null }, [
+      el('summary', { class: 'bg-head' }, [
+        el('h2', {}, shownGroups ? 'Other categories' : 'Your categories'),
+        el('span', { class: 'muted small' }, `${unused.length} not used this month`),
+      ]),
+      el('p', { class: 'muted small unused-hint' }, 'Tap one to give it a budget.'),
+      ...unused.map((r) => budgetRow(r)),
+    ]));
+  }
   return root;
+}
+
+function stat(label, value, tone) {
+  return el('div', { class: 'bs-stat' }, [
+    el('span', { class: 'bs-label' }, label),
+    el('span', { class: 'bs-value ' + (tone || '') }, value),
+  ]);
+}
+
+function budgetRow({ c, kind, budget, amount, carry }) {
+  const isIncome = kind === 'income';
+  const over = budget > 0 && amount > budget;
+  let right, sub = null;
+  if (isIncome) {
+    right = el('span', { class: 'br-amt' + (amount ? ' pos' : ' muted') }, fmtUSD(amount));
+  } else if (budget > 0) {
+    right = el('span', { class: 'br-amt' }, [
+      el('span', { class: over ? 'neg' : '' }, fmtUSD(amount)),
+      el('span', { class: 'muted' }, ` / ${fmtUSD(budget)}`),
+    ]);
+    sub = el('span', { class: 'br-sub ' + (over ? 'neg' : 'muted') },
+      over ? `${fmtUSD(amount - budget)} over` : `${fmtUSD(budget - amount)} left`);
+  } else {
+    right = el('span', { class: 'br-amt' + (amount ? '' : ' muted') }, amount ? fmtUSD(amount) : '—');
+    sub = el('span', { class: 'br-sub muted' }, 'No budget');
+  }
+  return el('button', { class: 'budget-row-btn', type: 'button', onClick: () => categorySheet(c) }, [
+    el('div', { class: 'br-top' }, [
+      el('span', { class: 'br-name' }, [
+        c.name,
+        c.rollover && Math.abs(carry) >= 0.01 ? el('span', { class: 'tag-mini ' + (carry > 0 ? 'pos' : 'neg') }, `${carry > 0 ? '+' : '−'}${fmtUSD(Math.abs(carry))} rolled over`) : null,
+      ]),
+      right,
+    ]),
+    budget > 0 && !isIncome ? progress(amount / budget, { over }) : null,
+    sub,
+  ]);
+}
+
+// Add / edit a category. Everything beyond name + budget is tucked under
+// "More options" so the common case stays simple.
+export function categorySheet(c, onDone = refresh) {
+  openSheet(c ? c.name : 'New category', (close) => {
+    const s = getSettings();
+    const name = el('input', { type: 'text', value: c?.name || '', placeholder: 'e.g. Groceries' });
+    const budget = el('input', { type: 'number', min: '0', step: '1', inputmode: 'decimal', value: Number(c?.monthly_budget_usd) || '', placeholder: 'No budget' });
+    const kind = el('select', {}, CATEGORY_KINDS.filter((k) => k.value !== 'tax' || s.modules.taxes)
+      .map((k) => el('option', { value: k.value, selected: (c ? kindOf(c) : 'soft') === k.value ? 'selected' : null }, k.label)));
+    const rollover = el('input', { type: 'checkbox', checked: c?.rollover ? 'checked' : null });
+    const defTreat = DEFAULT_CATEGORIES.find((d) => d.name === c?.name)?.tax_treatment
+      || ((c?.name || '').toLowerCase() === 'income' ? s.tax.main_income : 'owed');
+    const treatment = el('select', {}, TAX_TREATMENTS.map((x) => el('option', { value: x.value, selected: (c?.tax_treatment || defTreat) === x.value ? 'selected' : null }, x.label)));
+    const deductible = el('input', { type: 'checkbox', checked: c?.tax_deductible ? 'checked' : null });
+
+    const budgetField = field(`Monthly budget (${CONFIG.BASE_CURRENCY})`, budget);
+    const rollRow = el('label', { class: 'check-row' }, [rollover, 'Roll unused budget into next month']);
+    const treatField = field('How is this income taxed?', treatment);
+    const deductRow = el('label', { class: 'check-row' }, [deductible, 'Tax-deductible (lowers your tax estimate)']);
+    const sync = () => {
+      const inc = kind.value === 'income';
+      budgetField.style.display = inc ? 'none' : '';
+      rollRow.style.display = inc ? 'none' : '';
+      treatField.style.display = s.modules.taxes && inc ? '' : 'none';
+      deductRow.style.display = s.modules.taxes && !inc && kind.value !== 'tax' ? '' : 'none';
+    };
+    kind.addEventListener('change', sync);
+    sync();
+
+    const save = el('button', { class: 'btn btn-primary btn-block' }, c ? 'Save' : 'Add category');
+    save.addEventListener('click', async () => {
+      const row = {
+        name: name.value.trim(),
+        kind: kind.value,
+        monthly_budget_usd: kind.value === 'income' ? 0 : parseFloat(budget.value) || 0,
+        rollover: kind.value !== 'income' && rollover.checked,
+        ...(s.modules.taxes ? {
+          tax_treatment: kind.value === 'income' ? treatment.value : null,
+          tax_deductible: kind.value !== 'income' && deductible.checked,
+        } : {}),
+      };
+      if (!row.name) return toast('Give it a name', 'error');
+      save.disabled = true;
+      try {
+        if (c) await db.updateCategory(c.id, row); else await db.createCategory(row);
+        toast(c ? 'Saved' : 'Category added', 'success'); close(); onDone();
+      } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
+    });
+
+    const body = el('div', { class: 'sheet-body' }, [
+      field('Name', name),
+      budgetField,
+      el('details', { class: 'more-opts', open: c ? null : null }, [
+        el('summary', {}, 'More options'),
+        field('Type', kind, 'Bills and everyday spending both count as spending; the type sorts them on your Plan.'),
+        rollRow, treatField, deductRow,
+      ]),
+      save,
+    ]);
+    if (c) {
+      body.append(el('button', { class: 'btn btn-ghost btn-block danger', onClick: async () => {
+        if (!confirm(`Delete "${c.name}"? Its transactions are kept but lose this label.`)) return;
+        await db.deleteCategory(c.id);
+        toast('Category deleted', 'info'); close(); onDone();
+      } }, 'Delete category'));
+    }
+    return body;
+  });
 }
 
 // --- Your data: export & restore -----------------------------------------------
