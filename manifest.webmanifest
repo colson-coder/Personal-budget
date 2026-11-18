@@ -1,7 +1,7 @@
 {
-  "name": "Personal Budget",
-  "short_name": "Budget",
-  "description": "Multi-currency personal finance tracker.",
+  "name": "Babylon's Purse",
+  "short_name": "Purse",
+  "description": "Budget, save, pay down debt and plan taxes — in any currency.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -13,13 +13,23 @@
       "name": "Add transaction",
       "short_name": "Add",
       "url": "./index.html#/add",
-      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Reports",
       "short_name": "Reports",
       "url": "./index.html#/reports",
-      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "./icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "icons": [

@@ -5,6 +5,7 @@
 
 import { db, setLocalMode } from '../db.js';
 import { el, toast } from '../util.js';
+import { CONFIG } from '../config.js';
 
 // Renders into a full-screen container; calls onAuthed() once the user is in
 // (either signed in, or local mode enabled).
@@ -38,7 +39,7 @@ export function renderAuth(onAuthed) {
     );
 
     const form = el('form', { class: 'auth-card card' }, [
-      el('h1', { class: 'auth-title' }, 'Personal Budget'),
+      el('h1', { class: 'auth-title' }, CONFIG.APP_NAME),
       el('p', { class: 'auth-sub' }, mode === 'login'
         ? 'Log in to sync across your devices.'
         : 'Create an account to sync across your devices.'),

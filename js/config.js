@@ -14,7 +14,7 @@
 
 export const CONFIG = {
   // Product name shown in the UI, manifest and page title. Change once to rebrand.
-  APP_NAME: 'Personal Budget',
+  APP_NAME: 'Babylon\'s Purse',
 
   // --- Supabase ---------------------------------------------------------------
   // Fill these in from: Supabase Dashboard → Project Settings → API.

@@ -133,7 +133,7 @@ export function dataCard() {
       try {
         const data = JSON.parse(await f.text());
         if (!Array.isArray(data.transactions) || !Array.isArray(data.categories)) {
-          throw new Error('not a Personal Budget backup file');
+          throw new Error(`not a ${CONFIG.APP_NAME} backup file`);
         }
         if (!confirm(`Replace ALL local data with this backup (${data.transactions.length} transactions)?`)) return;
         await db.restoreAll(data);

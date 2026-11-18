@@ -1,4 +1,6 @@
-# Personal Budget
+# Babylon's Purse
+
+> *"A part of all you earn is yours to keep."* — the first rule from *The Richest Man in Babylon*, and what the money plan automates.
 
 A complete personal finance tracker that **adapts to whoever uses it**. A short
 setup asks a few plain questions — home currency, timezone, what you want to
