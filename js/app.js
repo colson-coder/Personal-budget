@@ -19,6 +19,7 @@ import { renderFunds } from './views/funds.js';
 import { renderDebts } from './views/debts.js';
 import { renderIncome } from './views/income.js';
 import { renderSettings } from './views/settings.js';
+import { renderTaxes } from './views/taxes.js';
 import { renderSetup } from './views/setup.js';
 import { renderMore } from './views/more.js';
 import { loadSettings, getSettings } from './store.js';
@@ -114,6 +115,7 @@ function renderShell() {
   defineRoute('/debts', renderDebts);
   defineRoute('/income', renderIncome);
   defineRoute('/settings', renderSettings);
+  defineRoute('/taxes', renderTaxes);
   defineRoute('/more', renderMore);
   setNotFound(renderDashboard);
 

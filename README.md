@@ -35,15 +35,26 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
   reached (e.g. 25% to the emergency fund until it hits its goal). The Plan
   page shows cash flow, where every dollar goes, and a month-by-month table.
 - **Funds** — emergency fund, giving, reserves, spending money: balances grow
-  from the plan, deposits and interest (APY, credited monthly) and shrink when
-  you spend from them. Goals, progress bars and balance sparklines.
-- **Debts** — loans, mortgages, cards: monthly amortization ledger from logged
-  payments, % paid off, interest paid, months left and payoff date, a warning
-  when payments don't cover interest, and a "what if I paid extra?" slider.
-  Payments can repeat automatically.
-- **Passive income** — rentals, dividends, interest, royalties, side
-  businesses: received this month / last 12 months / average, behind or ahead
-  of an expected amount, and (rentals only) security deposits held.
+  from the plan and deposits, shrink when you spend from them. Each fund says
+  where the money is kept: in an account that pays interest (estimated from
+  APY, or the actual interest you enter) or as cash, which earns nothing.
+  Interest earned is tracked per fund and counts as taxable income.
+- **Debts** — loans, mortgages, cards: built on the minimum monthly payment
+  (entered, or worked out from the loan length), assumed paid every month on
+  its due day. Log what you actually paid and that month's figure replaces the
+  minimum, so extra payments move the payoff date. Shows % paid off, interest
+  paid, extra paid, payoff date, a warning when the minimum doesn't cover the
+  interest, and a "what if I paid extra?" slider.
+- **Passive income** — dividends, interest, side business, rental income,
+  royalties: received this month / last 12 months / average, and behind or
+  ahead of an expected amount.
+- **Taxes** — works for any country: one rate or your own brackets, a
+  tax-free allowance, and a tax year starting in any month. Income categories
+  say whether tax is already taken out, owed, or not taxable; expense
+  categories can be deductible. Shows estimated tax so far, paid, still to
+  pay, a full-year projection from your pace, how much to set aside monthly,
+  and quarter-by-quarter status. A "% of all income" plan rule can fill a Tax
+  reserve fund automatically. Estimates only — not tax advice.
 - **Home** — total balance, this month's spend vs. budget per category, plus
   tiles for whichever features are on (saved in funds, left unassigned, debt
   remaining, passive income), and the 5 most recent transactions.
@@ -108,9 +119,9 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 │   └── views/                # One module per page
 │       ├── setup.js  settings.js  auth.js
 │       ├── dashboard.js  transactions.js  add.js  reports.js
-│       ├── plan.js  funds.js  debts.js  income.js
+│       ├── plan.js  funds.js  debts.js  income.js  taxes.js
 │       └── categories.js  import.js  more.js
-├── tests/finance.test.mjs    # Engine tests: node tests/finance.test.mjs
+├── tests/finance.test.mjs    # Engine tests (18): node tests/finance.test.mjs
 ├── icons/                    # PWA icons (192, 512, 180 apple-touch)
 └── sql/
     ├── schema.sql            # Tables

@@ -130,3 +130,13 @@ alter table public.transactions alter column category_id drop not null;
 alter table public.recurring add column if not exists fund_id uuid references public.funds (id) on delete set null;
 alter table public.recurring add column if not exists debt_id uuid references public.debts (id) on delete set null;
 alter table public.recurring add column if not exists stream_id uuid references public.income_streams (id) on delete set null;
+
+-- =============================================================================
+-- Taxes, interest modes, minimum-payment loans. Idempotent.
+-- =============================================================================
+alter table public.categories add column if not exists tax_treatment text;          -- withheld | owed | none (income)
+alter table public.categories add column if not exists tax_deductible boolean not null default false;
+alter table public.funds add column if not exists interest_mode text;              -- auto | manual | none
+alter table public.debts add column if not exists term_months int;                  -- derive minimum payment if no payment given
+alter table public.debts add column if not exists due_day int not null default 1;
+-- Passive income no longer tracks rental deposits (column kept harmlessly if it exists).

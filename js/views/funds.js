@@ -9,6 +9,7 @@ import { CONFIG } from '../config.js';
 import { loadAll, ensureCategory } from '../store.js';
 import { convertToUSD } from '../rates.js';
 import { el, fmtUSD, toast, todayISO, openSheet, field, sparkline, progress, isValidISODate } from '../util.js';
+import { interestMode } from '../finance.js';
 import { navigate } from '../router.js';
 
 export const FUND_KINDS = [
@@ -18,6 +19,13 @@ export const FUND_KINDS = [
   { value: 'spending', label: 'Spending money', icon: '◎' },
 ];
 const kindMeta = (k) => FUND_KINDS.find((x) => x.value === k) || FUND_KINDS[0];
+const INTEREST_LABEL = (f) => f.interestMode === 'auto' ? `earns ${f.fund.apy}% APY`
+  : f.interestMode === 'manual' ? 'interest logged by you' : 'no interest (cash)';
+export const INTEREST_MODES = [
+  { value: 'auto', label: 'In an account that pays interest — estimate it for me' },
+  { value: 'manual', label: 'In an account that pays interest — I’ll enter what I get' },
+  { value: 'none', label: 'Cash / checking — earns no interest' },
+];
 const refresh = () => navigate('/funds');
 
 export async function renderFunds() {
@@ -32,7 +40,7 @@ export async function renderFunds() {
 
   root.append(el('div', { class: 'grid cards-3' }, [
     tile('Total in funds', fmtUSD(sim.total)),
-    tile('Interest earned', fmtUSD(sim.interestToDate), 'pos'),
+    tile('Interest earned so far', fmtUSD(sim.interestToDate), 'pos'),
     tile('Interest this month (est.)', fmtUSD(sim.funds.reduce((a, f) => a + f.interestThisMonth, 0)), 'pos'),
   ]));
 
@@ -69,7 +77,7 @@ function fundCard(f, data) {
       el('span', { class: 'fund-icon' }, meta.icon),
       el('div', { class: 'rec-main' }, [
         el('span', { class: 'rec-desc' }, f.fund.name),
-        el('span', { class: 'rec-meta' }, [meta.label, Number(f.fund.apy) ? ` · ${f.fund.apy}% APY` : ''].join('')),
+        el('span', { class: 'rec-meta' }, [meta.label, ' · ', INTEREST_LABEL(f)].join('')),
       ]),
       el('button', { class: 'icon-btn', title: 'Edit fund', onClick: () => fundSheet(f.fund) }, '✎'),
     ]),
@@ -96,7 +104,11 @@ function fundCard(f, data) {
     ]));
   }
 
+  if (f.totals.interest > 0) {
+    card.append(el('div', { class: 'muted small fund-interest' }, `${fmtUSD(f.totals.interest)} interest earned so far`));
+  }
   card.append(el('div', { class: 'fund-actions' }, [
+    f.interestMode === 'manual' ? el('button', { class: 'btn btn-sm', onClick: () => moneySheet(f.fund, 'interest', data) }, 'Record interest') : null,
     el('button', { class: 'btn btn-sm', onClick: () => moneySheet(f.fund, 'in', data) }, 'Add money'),
     el('button', { class: 'btn btn-sm', onClick: () => moneySheet(f.fund, 'out', data) }, isGiving ? 'Record a gift' : 'Spend from it'),
   ]));
@@ -117,7 +129,13 @@ export function fundSheet(fund, onDone = refresh) {
     const kind = el('select', {}, FUND_KINDS.map((k) => el('option', { value: k.value, selected: (fund?.kind || 'savings') === k.value ? 'selected' : null }, k.label)));
     const start = el('input', { type: 'number', step: '0.01', inputmode: 'decimal', value: fund?.starting_balance ?? '', placeholder: '0.00' });
     const goal = el('input', { type: 'number', step: '1', min: '0', inputmode: 'decimal', value: fund?.goal_usd || '', placeholder: 'optional' });
-    const apy = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: fund?.apy || '', placeholder: '0' });
+    const apy = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: fund?.apy || '', placeholder: 'e.g. 4.5' });
+    const defaultMode = fund ? interestMode(fund) : 'none';
+    const mode = el('select', {}, INTEREST_MODES.map((m) => el('option', { value: m.value, selected: m.value === defaultMode ? 'selected' : null }, m.label)));
+    const apyField = field('Interest rate (APY %)', apy);
+    const syncMode = () => { apyField.style.display = mode.value === 'auto' ? '' : 'none'; };
+    mode.addEventListener('change', syncMode);
+    syncMode();
     const save = el('button', { class: 'btn btn-primary btn-block' }, fund ? 'Save' : 'Create fund');
 
     save.addEventListener('click', async () => {
@@ -125,8 +143,10 @@ export function fundSheet(fund, onDone = refresh) {
         name: name.value.trim(), kind: kind.value,
         starting_balance: parseFloat(start.value) || 0,
         goal_usd: parseFloat(goal.value) || 0,
-        apy: parseFloat(apy.value) || 0,
+        apy: mode.value === 'auto' ? parseFloat(apy.value) || 0 : 0,
+        interest_mode: mode.value,
       };
+      if (row.interest_mode === 'auto' && !(row.apy > 0)) return toast('Enter the interest rate, or pick another option', 'error');
       if (!row.name) return toast('Give the fund a name', 'error');
       save.disabled = true;
       try {
@@ -138,7 +158,9 @@ export function fundSheet(fund, onDone = refresh) {
 
     const body = el('div', { class: 'sheet-body' }, [
       field('Name', name),
-      el('div', { class: 'row-2' }, [field('Type', kind), field('Interest (APY %)', apy)]),
+      field('Type', kind),
+      field('Where is this money kept?', mode, 'Money you hold as cash earns nothing, so it isn’t given interest.'),
+      apyField,
       el('div', { class: 'row-2' }, [
         field(`Current balance (${CONFIG.BASE_CURRENCY})`, start, 'What’s already in it today'),
         field(`Goal (${CONFIG.BASE_CURRENCY})`, goal),
@@ -159,7 +181,7 @@ export function fundSheet(fund, onDone = refresh) {
 // Move money into a fund (transfer) or spend from it (expense paid from fund).
 function moneySheet(fund, dir, data) {
   const isGiving = fund.kind === 'giving';
-  const title = dir === 'in' ? `Add money to ${fund.name}` : isGiving ? `Record a gift from ${fund.name}` : `Spend from ${fund.name}`;
+  const title = dir === 'interest' ? `Interest earned — ${fund.name}` : dir === 'in' ? `Add money to ${fund.name}` : isGiving ? `Record a gift from ${fund.name}` : `Spend from ${fund.name}`;
   openSheet(title, (close) => {
     const amount = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', placeholder: '0.00' });
     const currency = el('select', {}, CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c)));
@@ -169,7 +191,7 @@ function moneySheet(fund, dir, data) {
     const cat = el('select', {}, expenseCats.map((c) => el('option', {
       value: c.id, selected: isGiving && c.name === 'Giving' ? 'selected' : null,
     }, c.name)));
-    const save = el('button', { class: 'btn btn-primary btn-block' }, dir === 'in' ? 'Add money' : 'Save');
+    const save = el('button', { class: 'btn btn-primary btn-block' }, dir === 'in' ? 'Add money' : dir === 'interest' ? 'Record interest' : 'Save');
 
     save.addEventListener('click', async () => {
       const amt = parseFloat(amount.value);
@@ -180,11 +202,13 @@ function moneySheet(fund, dir, data) {
         const { amount_usd, exchange_rate } = await convertToUSD(amt, currency.value, date.value);
         let category_id = dir === 'out' ? cat.value : null;
         if (dir === 'out' && isGiving && !category_id) category_id = (await ensureCategory('Giving', 'soft')).id;
+        if (dir === 'interest') category_id = (await ensureCategory('Interest', 'income')).id;
         await db.createTransaction({
-          type: dir === 'in' ? 'transfer' : 'expense',
+          type: dir === 'in' ? 'transfer' : dir === 'interest' ? 'income' : 'expense',
+          ...(dir === 'interest' ? { subtype: 'interest' } : {}),
           date: date.value, amount: amt, currency: currency.value, amount_usd, exchange_rate,
           category_id, fund_id: fund.id,
-          description: desc.value.trim() || (dir === 'in' ? `Added to ${fund.name}` : ''),
+          description: desc.value.trim() || (dir === 'in' ? `Added to ${fund.name}` : dir === 'interest' ? `Interest — ${fund.name}` : ''),
         });
         toast('Saved', 'success'); close(); refresh();
       } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
@@ -195,7 +219,9 @@ function moneySheet(fund, dir, data) {
       dir === 'out' ? field('Category', cat) : null,
       field('Date', date),
       field('Note', desc),
-      el('p', { class: 'muted small' }, dir === 'in'
+      el('p', { class: 'muted small' }, dir === 'interest'
+        ? 'Interest your bank paid on this fund. It’s added to the balance and counted as taxable interest.'
+        : dir === 'in'
         ? 'Moves money you already have into this fund — it isn’t counted as income.'
         : 'Paid from money already set aside, so it won’t count against this month’s plan.'),
       save,

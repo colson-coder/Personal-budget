@@ -269,7 +269,8 @@ async function overviewStrip(ym) {
     if (p.lines.length) tiles.push(tile('Left unassigned', fmtUSD(p.unallocated), `#/plan?month=${ym}`, p.unallocated < 0 ? 'neg' : ''));
   }
   if (m.debts && d.debts.length) {
-    const owed = d.debts.reduce((a, x) => a + debtLedger(x, d.txs, d.todayYM).balance, 0);
+    const day = Number(todayISO().slice(8, 10));
+    const owed = d.debts.reduce((a, x) => a + debtLedger(x, d.txs, d.todayYM, day).balance, 0);
     tiles.push(tile('Debt remaining', fmtUSD(owed), '#/debts', 'neg'));
   }
   if (m.income && d.streams.length) {

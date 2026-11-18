@@ -1,8 +1,8 @@
 // =============================================================================
-// income.js — Passive income: rentals, dividends, interest, royalties, side
-// businesses. Each stream tracks what came in, optionally against an expected
-// monthly amount (behind / ahead). Rentals can also hold a security deposit.
-// Payments are income transactions linked by stream_id.
+// income.js — Passive income: dividends, interest, rental income, side
+// business, royalties. Each stream tracks what came in, optionally against an
+// expected monthly amount (behind / ahead). Payments are income transactions
+// linked by stream_id.
 // =============================================================================
 
 import { db } from '../db.js';
@@ -16,11 +16,11 @@ import {
 import { navigate } from '../router.js';
 
 export const STREAM_KINDS = [
-  { value: 'rental', label: 'Rental property', icon: '⌂' },
   { value: 'dividends', label: 'Dividends', icon: '◈' },
   { value: 'interest', label: 'Interest', icon: '%' },
-  { value: 'royalties', label: 'Royalties', icon: '♪' },
   { value: 'business', label: 'Side business', icon: '◆' },
+  { value: 'rental', label: 'Rental income', icon: '⌂' },
+  { value: 'royalties', label: 'Royalties', icon: '♪' },
   { value: 'other', label: 'Other', icon: '✦' },
 ];
 const kindMeta = (k) => STREAM_KINDS.find((x) => x.value === k) || STREAM_KINDS[5];
@@ -37,7 +37,7 @@ export async function renderIncome() {
 
   if (!streams.length) {
     root.append(el('div', { class: 'card empty' }, [
-      el('p', {}, 'Money that comes in without a paycheck: rent, dividends, interest, royalties, a side business.'),
+      el('p', {}, 'Money that comes in besides your paycheck: dividends, interest, a side business, rental income.'),
       el('p', { class: 'muted small' }, 'Add a stream to see what each one earns per month and per year.'),
       el('button', { class: 'btn btn-primary btn-sm', onClick: () => streamSheet(null) }, 'Add your first stream'),
     ]));
@@ -74,17 +74,15 @@ function stat(label, value, tone) {
 function streamCard(s, l) {
   const meta = kindMeta(s.kind);
   const expected = Number(s.expected_monthly) || 0;
-  const isRental = s.kind === 'rental';
 
   const stats = [
     stat('Last 12 months', fmtBase(l.last12), 'pos'),
     stat('Avg / month', fmtBase(l.avgMonthly)),
   ];
   if (expected > 0) {
-    stats.push(stat(l.behind > 0 ? (isRental ? 'Tenant owes' : 'Behind expected') : 'Ahead of expected',
+    stats.push(stat(l.behind > 0 ? 'Behind expected' : 'Ahead of expected',
       fmtBase(Math.abs(l.behind)), l.behind > 0 ? 'neg' : 'pos'));
   }
-  if (isRental) stats.push(stat('Deposit held', fmtBase(l.deposit)));
 
   const card = el('div', { class: 'card fund-card' }, [
     el('div', { class: 'fund-top' }, [
@@ -103,14 +101,13 @@ function streamCard(s, l) {
   card.append(el('div', { class: 'stat-grid' }, stats));
 
   card.append(el('div', { class: 'fund-actions' }, [
-    el('button', { class: 'btn btn-primary btn-sm', onClick: () => receivedSheet(s, false) }, 'Log income'),
-    isRental ? el('button', { class: 'btn btn-sm', onClick: () => receivedSheet(s, true) }, 'Deposit') : null,
+    el('button', { class: 'btn btn-primary btn-sm', onClick: () => receivedSheet(s) }, 'Log income'),
   ]));
 
   card.append(el('details', { class: 'ledger' }, [
     el('summary', {}, 'Month by month'),
     el('div', { class: 'ytable ledger-table' }, [
-      el('div', { class: 'yrow yhead' }, (expected ? ['Month', 'Expected', 'Received', isRental ? 'Owed' : 'Behind'] : ['Month', 'Received']).map((h) => el('span', {}, h))),
+      el('div', { class: 'yrow yhead' }, (expected ? ['Month', 'Expected', 'Received', 'Behind'] : ['Month', 'Received']).map((h) => el('span', {}, h))),
       ...l.rows.slice().reverse().map((r) => el('div', { class: 'yrow' + (expected ? '' : ' yrow-2') }, expected ? [
         el('span', {}, shortMonth(r.ym)),
         el('span', {}, fmtBase(r.expected)),
@@ -127,15 +124,10 @@ function streamCard(s, l) {
 
 export function streamSheet(s, onDone = refresh) {
   openSheet(s ? `Edit ${s.name}` : 'Add an income stream', (close) => {
-    const name = el('input', { type: 'text', value: s?.name || '', placeholder: 'e.g. Duplex rent, Index fund dividends' });
-    const kind = el('select', {}, STREAM_KINDS.map((k) => el('option', { value: k.value, selected: (s?.kind || 'rental') === k.value ? 'selected' : null }, k.label)));
+    const name = el('input', { type: 'text', value: s?.name || '', placeholder: 'e.g. Index fund dividends, Etsy shop' });
+    const kind = el('select', {}, STREAM_KINDS.map((k) => el('option', { value: k.value, selected: (s?.kind || 'dividends') === k.value ? 'selected' : null }, k.label)));
     const expected = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: s?.expected_monthly || '', placeholder: 'optional' });
     const start = el('input', { type: 'month', value: s?.start_month || todayISO().slice(0, 7) });
-    const deposit = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: s?.deposit_start || '', placeholder: '0' });
-    const depositField = field('Deposit already held', deposit);
-    const syncKind = () => { depositField.style.display = kind.value === 'rental' ? '' : 'none'; };
-    kind.addEventListener('change', syncKind);
-    syncKind();
     const save = el('button', { class: 'btn btn-primary btn-block' }, s ? 'Save' : 'Add stream');
 
     save.addEventListener('click', async () => {
@@ -143,7 +135,6 @@ export function streamSheet(s, onDone = refresh) {
         name: name.value.trim(), kind: kind.value,
         expected_monthly: parseFloat(expected.value) || 0,
         start_month: start.value || todayISO().slice(0, 7),
-        deposit_start: kind.value === 'rental' ? parseFloat(deposit.value) || 0 : 0,
       };
       if (!row.name) return toast('Give the stream a name', 'error');
       save.disabled = true;
@@ -156,7 +147,7 @@ export function streamSheet(s, onDone = refresh) {
     const body = el('div', { class: 'sheet-body' }, [
       field('Name', name),
       el('div', { class: 'row-2' }, [field('Type', kind), field(`Expected per month (${CONFIG.BASE_CURRENCY})`, expected)]),
-      el('div', { class: 'row-2' }, [field('Tracking starts', start), depositField]),
+      field('Tracking starts', start),
       save,
     ]);
     if (s) {
@@ -170,12 +161,11 @@ export function streamSheet(s, onDone = refresh) {
   });
 }
 
-function receivedSheet(s, isDeposit) {
-  openSheet(isDeposit ? `Deposit — ${s.name}` : `Income — ${s.name}`, (close) => {
-    const amount = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: isDeposit ? '' : s.expected_monthly || '' });
+function receivedSheet(s) {
+  openSheet(`Income — ${s.name}`, (close) => {
+    const amount = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: s.expected_monthly || '' });
     const currency = el('select', {}, CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c)));
     const date = el('input', { type: 'date', value: todayISO(), max: todayISO() });
-    const refund = el('input', { type: 'checkbox' });
     const note = el('input', { type: 'text', placeholder: 'optional' });
     const save = el('button', { class: 'btn btn-primary btn-block' }, 'Save');
 
@@ -185,15 +175,11 @@ function receivedSheet(s, isDeposit) {
       if (!isValidISODate(date.value)) return toast('Pick a date', 'error');
       save.disabled = true;
       try {
-        const cat = await ensureCategory('Passive Income', 'income');
+        const cat = await ensureCategory(s.kind === 'interest' ? 'Interest' : 'Passive Income', 'income');
         const { amount_usd, exchange_rate } = await convertToBase(amt, currency.value, date.value);
-        const isRefund = isDeposit && refund.checked;
         await db.createTransaction({
-          type: isRefund ? 'expense' : 'income',
-          date: date.value, amount: amt, currency: currency.value, amount_usd, exchange_rate,
-          category_id: cat.id, stream_id: s.id,
-          ...(isDeposit ? { subtype: 'deposit' } : {}),
-          description: note.value.trim() || (isDeposit ? (isRefund ? 'Deposit returned' : 'Security deposit') : s.name),
+          type: 'income', date: date.value, amount: amt, currency: currency.value, amount_usd, exchange_rate,
+          category_id: cat.id, stream_id: s.id, description: note.value.trim() || s.name,
         });
         toast('Saved', 'success'); close(); refresh();
       } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
@@ -203,8 +189,6 @@ function receivedSheet(s, isDeposit) {
       el('div', { class: 'row-2' }, [field('Amount', amount), field('Currency', currency)]),
       field('Date', date),
       field('Note', note),
-      isDeposit ? el('label', { class: 'check-row' }, [refund, 'I’m returning deposit money to the tenant']) : null,
-      isDeposit ? el('p', { class: 'muted small' }, 'Deposits are held for the tenant, so they don’t count as income.') : null,
       save,
     ]);
   });

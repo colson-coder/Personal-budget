@@ -11,6 +11,7 @@ import { CONFIG, SUPPORTED_CURRENCIES } from '../config.js';
 import { saveSettings } from '../store.js';
 import { STREAM_KINDS } from './income.js';
 import { el, toast, todayISO, field } from '../util.js';
+import { DEFAULT_TAX } from '../finance.js';
 
 const CURRENCY_NAMES = {
   USD: 'US dollar', EUR: 'Euro', GBP: 'British pound', CRC: 'Costa Rican colón',
@@ -44,7 +45,8 @@ export function renderSetup(onDone) {
     base: guessCurrency(),
     currencies: null, // set below to include the guessed base
     timezone: deviceTz,
-    modules: { plan: true, debts: false, income: false },
+    modules: { plan: true, debts: false, income: false, taxes: false },
+    tax: { main_income: 'withheld', rate: 15, set_aside: 0, year_start_month: 1 },
     givingPct: 0,
     emergencyGoal: 1000,
     emergencyPct: 25,
@@ -53,7 +55,7 @@ export function renderSetup(onDone) {
     savingsBalance: '',
     apy: '',
     debt: { name: '', principal: '', apr: '', payment: '' },
-    stream: { name: '', kind: 'rental', expected: '' },
+    stream: { name: '', kind: 'dividends', expected: '' },
   };
 
   state.currencies = new Set([state.base]);
@@ -66,6 +68,7 @@ export function renderSetup(onDone) {
     ...(state.modules.plan ? [stepPlan] : []),
     ...(state.modules.debts ? [stepDebt] : []),
     ...(state.modules.income ? [stepIncome] : []),
+    ...(state.modules.taxes ? [stepTaxes] : []),
     stepDone,
   ];
 
@@ -140,7 +143,8 @@ export function renderSetup(onDone) {
       el('div', { class: 'feature-list' }, [
         opt('plan', 'Savings & money plan', 'Split each month’s income into funds: emergency, giving, reserves, goals.', '◆'),
         opt('debts', 'Debts & loans', 'Mortgage, car, student loan, cards — balance, interest, payoff date.', '⌂'),
-        opt('income', 'Passive income', 'Rentals, dividends, interest, royalties, side business.', '✦'),
+        opt('income', 'Passive income', 'Dividends, interest, a side business — money beyond your paycheck.', '✦'),
+        opt('taxes', 'Taxes', 'See what you’ll owe and how much to set aside — great for side income.', '§'),
       ]),
     ]);
   }
@@ -186,7 +190,8 @@ export function renderSetup(onDone) {
         rows,
         el('button', { class: 'btn btn-sm', type: 'button', onClick: () => { state.setAsides.push({ name: '', amount: '' }); drawRows(); } }, '＋ Add a fixed amount'),
       ]),
-      field('Interest your savings earn (APY %)', num('apy', { placeholder: '0' }), 'Optional — used to grow fund balances each month.'),
+      field('Interest your savings account pays (APY %)', num('apy', { placeholder: '0' }),
+        'Only funds kept in that account earn it. Giving and spending money you hold as cash won’t.'),
     ]);
   }
 
@@ -211,7 +216,7 @@ export function renderSetup(onDone) {
 
   // --- Step 5: first income stream --------------------------------------------------------
   function stepIncome() {
-    const name = el('input', { type: 'text', value: state.stream.name, placeholder: 'e.g. Duplex rent, Dividends' });
+    const name = el('input', { type: 'text', value: state.stream.name, placeholder: 'e.g. Dividends, Etsy shop' });
     name.addEventListener('input', () => { state.stream.name = name.value; });
     const kind = el('select', {}, STREAM_KINDS.map((k) => el('option', { value: k.value, selected: k.value === state.stream.kind ? 'selected' : null }, k.label)));
     kind.addEventListener('change', () => { state.stream.kind = kind.value; });
@@ -225,6 +230,32 @@ export function renderSetup(onDone) {
     ]);
   }
 
+  // --- Step 6: taxes -------------------------------------------------------------------------
+  function stepTaxes() {
+    const main = el('select', {}, [
+      ['withheld', 'Taken out by my employer'], ['owed', 'I pay it myself (self-employed)'], ['none', 'My income isn’t taxed'],
+    ].map(([v, l]) => el('option', { value: v, selected: state.tax.main_income === v ? 'selected' : null }, l)));
+    main.addEventListener('change', () => { state.tax.main_income = main.value; });
+    const rate = el('input', { type: 'number', inputmode: 'decimal', min: '0', max: '100', step: 'any', value: state.tax.rate });
+    rate.addEventListener('input', () => { state.tax.rate = rate.value; });
+    const aside = el('input', { type: 'number', inputmode: 'decimal', min: '0', max: '100', step: 'any', value: state.tax.set_aside || '', placeholder: '0' });
+    aside.addEventListener('input', () => { state.tax.set_aside = aside.value; });
+    const start = el('select', {}, ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      .map((m, i) => el('option', { value: i + 1, selected: state.tax.year_start_month === i + 1 ? 'selected' : null }, m)));
+    start.addEventListener('change', () => { state.tax.year_start_month = Number(start.value); });
+    return el('div', { class: 'setup-step' }, [
+      el('h1', {}, 'Taxes'),
+      el('p', { class: 'muted' }, 'We’ll estimate tax on income that isn’t taxed before you get it — side jobs, interest, dividends. You can fine-tune brackets later.'),
+      field('Tax on my main paycheck is…', main),
+      el('div', { class: 'row-2' }, [
+        field('Your tax rate (%)', rate, 'Your top rate is a safe guess'),
+        field('Tax year starts', start),
+      ]),
+      state.modules.plan ? field('Set aside for taxes (% of income)', aside, 'Moves this share of every paycheck into a Tax reserve fund. Freelancers often use 25–30%.') : null,
+      el('p', { class: 'muted small' }, 'Estimates only — not tax advice.'),
+    ]);
+  }
+
   // --- Done ---------------------------------------------------------------------------------
   function stepDone() {
     const items = [`Home currency: ${state.base}`, `Timezone: ${state.timezone.replace(/_/g, ' ')}`];
@@ -234,6 +265,7 @@ export function renderSetup(onDone) {
       if (Number(state.emergencyGoal) > 0 && Number(state.emergencyPct) > 0) items.push(`${state.emergencyPct}% of what’s left to an Emergency Fund until ${state.emergencyGoal} ${state.base}`);
     }
     if (state.modules.debts && state.debt.name) items.push(`Tracking ${state.debt.name}`);
+    if (state.modules.taxes) items.push(`Tax estimate at ${state.tax.rate}%${Number(state.tax.set_aside) > 0 && state.modules.plan ? `, ${state.tax.set_aside}% of income set aside` : ''}`);
     if (state.modules.income && state.stream.name) items.push(`Tracking ${state.stream.name}`);
     return el('div', { class: 'setup-step' }, [
       el('h1', {}, state.name ? `You’re all set, ${state.name}` : 'You’re all set'),
@@ -257,30 +289,38 @@ export function renderSetup(onDone) {
       await saveSettings({
         name: state.name.trim(), base_currency: state.base, timezone: state.timezone,
         currencies: [...state.currencies], modules: state.modules,
+        ...(state.modules.taxes ? { tax: {
+          ...DEFAULT_TAX, main_income: state.tax.main_income,
+          rate: parseFloat(state.tax.rate) || 0, year_start_month: state.tax.year_start_month,
+        } } : {}),
       });
 
       const rules = [];
       const apy = parseFloat(state.apy) || 0;
       if (state.modules.plan) {
+        if (state.modules.taxes && Number(state.tax.set_aside) > 0) {
+          const f = await db.create('funds', { name: 'Tax reserve', kind: 'reserve', starting_balance: 0, goal_usd: 0, apy, interest_mode: apy > 0 ? 'auto' : 'none' });
+          rules.push({ id: crypto.randomUUID(), fund_id: f.id, method: 'percent_income', value: Number(state.tax.set_aside) });
+        }
         if (Number(state.givingPct) > 0) {
-          const f = await db.create('funds', { name: 'Giving', kind: 'giving', starting_balance: 0, goal_usd: 0, apy: 0 });
+          const f = await db.create('funds', { name: 'Giving', kind: 'giving', starting_balance: 0, goal_usd: 0, apy: 0, interest_mode: 'none' });
           rules.push({ id: crypto.randomUUID(), fund_id: f.id, method: 'percent_net', value: Number(state.givingPct) });
         }
         for (const r of state.setAsides) {
           if (!r.name.trim() || !(Number(r.amount) > 0)) continue;
           const spending = /spend|fun|allowance|personal/i.test(r.name);
-          const f = await db.create('funds', { name: r.name.trim(), kind: spending ? 'spending' : 'reserve', starting_balance: 0, goal_usd: 0, apy: spending ? 0 : apy });
+          const f = await db.create('funds', { name: r.name.trim(), kind: spending ? 'spending' : 'reserve', starting_balance: 0, goal_usd: 0, apy: spending ? 0 : apy, interest_mode: !spending && apy > 0 ? 'auto' : 'none' });
           rules.push({ id: crypto.randomUUID(), fund_id: f.id, method: 'fixed', value: Number(r.amount) });
         }
         if (Number(state.emergencyGoal) > 0 && Number(state.emergencyPct) > 0) {
-          const f = await db.create('funds', { name: 'Emergency Fund', kind: 'savings', starting_balance: 0, goal_usd: Number(state.emergencyGoal), apy });
+          const f = await db.create('funds', { name: 'Emergency Fund', kind: 'savings', starting_balance: 0, goal_usd: Number(state.emergencyGoal), apy, interest_mode: apy > 0 ? 'auto' : 'none' });
           rules.push({
             id: crypto.randomUUID(), fund_id: f.id, method: 'percent_remainder',
             value: Number(state.emergencyPct), value_after_goal: Number(state.emergencyAfterPct) || 0,
           });
         }
         if (Number(state.savingsBalance) > 0) {
-          await db.create('funds', { name: 'Savings', kind: 'savings', starting_balance: Number(state.savingsBalance), goal_usd: 0, apy });
+          await db.create('funds', { name: 'Savings', kind: 'savings', starting_balance: Number(state.savingsBalance), goal_usd: 0, apy, interest_mode: apy > 0 ? 'auto' : 'none' });
         }
       }
       if (state.modules.debts && state.debt.name.trim() && Number(state.debt.principal) > 0) {
@@ -294,7 +334,7 @@ export function renderSetup(onDone) {
         await db.create('income_streams', {
           name: state.stream.name.trim(), kind: state.stream.kind,
           expected_monthly: Number(state.stream.expected) || 0,
-          start_month: todayISO().slice(0, 7), deposit_start: 0,
+          start_month: todayISO().slice(0, 7),
         });
       }
       await saveSettings({ setup_done: true, plan: { start_month: todayISO().slice(0, 7), rules } });

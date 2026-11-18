@@ -51,6 +51,7 @@ export const SUPPORTED_CURRENCIES = [
 // Predefined categories seeded on first use. `kind` drives the money plan:
 //   hard   = fixed bills / needs        soft = flexible spending
 //   debt   = loan & card payments       income = money in
+//   tax    = tax payments (tracked on the Taxes page)
 export const DEFAULT_CATEGORIES = [
   { name: 'Housing/Rent', kind: 'hard', monthly_budget_usd: 0 },
   { name: 'Utilities', kind: 'hard', monthly_budget_usd: 0 },
@@ -64,8 +65,10 @@ export const DEFAULT_CATEGORIES = [
   { name: 'Health', kind: 'soft', monthly_budget_usd: 0 },
   { name: 'Giving', kind: 'soft', monthly_budget_usd: 0 },
   { name: 'Debt Payment', kind: 'debt', monthly_budget_usd: 0 },
+  { name: 'Taxes', kind: 'tax', monthly_budget_usd: 0 },
   { name: 'Income', kind: 'income', monthly_budget_usd: 0 },
-  { name: 'Passive Income', kind: 'income', monthly_budget_usd: 0 },
+  { name: 'Passive Income', kind: 'income', tax_treatment: 'owed', monthly_budget_usd: 0 },
+  { name: 'Interest', kind: 'income', tax_treatment: 'owed', monthly_budget_usd: 0 },
   { name: 'Other', kind: 'soft', monthly_budget_usd: 0 },
 ];
 
@@ -73,7 +76,14 @@ export const CATEGORY_KINDS = [
   { value: 'hard', label: 'Fixed bill' },
   { value: 'soft', label: 'Flexible' },
   { value: 'debt', label: 'Debt payment' },
+  { value: 'tax', label: 'Tax payment' },
   { value: 'income', label: 'Income' },
+];
+
+export const TAX_TREATMENTS = [
+  { value: 'withheld', label: 'Tax taken out already' },
+  { value: 'owed', label: 'I owe tax on this' },
+  { value: 'none', label: 'Not taxable' },
 ];
 
 // Per-user preferences (stored via db.getSettings/saveSettings).
@@ -83,6 +93,7 @@ export const DEFAULT_SETTINGS = {
   currencies: ['USD'],
   base_currency: 'USD',
   timezone: null,                     // null → device timezone
-  modules: { plan: true, debts: false, income: false },
+  modules: { plan: true, debts: false, income: false, taxes: false },
+  tax: null,                          // null → finance.DEFAULT_TAX
   plan: { start_month: null, rules: [] },
 };

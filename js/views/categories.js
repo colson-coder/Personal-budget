@@ -4,7 +4,8 @@
 // =============================================================================
 
 import { db, isLocalMode, TABLES } from '../db.js';
-import { CATEGORY_KINDS, CONFIG } from '../config.js';
+import { CATEGORY_KINDS, CONFIG, TAX_TREATMENTS, DEFAULT_CATEGORIES } from '../config.js';
+import { getSettings } from '../store.js';
 import { kindOf } from '../store.js';
 import { el, fmtUSD, toast } from '../util.js';
 
@@ -31,13 +32,31 @@ export async function renderCategories() {
     const rollover = el('input', { type: 'checkbox', class: 'cat-rollover', checked: c.rollover ? 'checked' : null });
     const kind = el('select', { class: 'cat-kind', title: 'How this category counts in your plan' },
       CATEGORY_KINDS.map((k) => el('option', { value: k.value, selected: kindOf(c) === k.value ? 'selected' : null }, k.label)));
+    // Tax controls (only when the Taxes feature is on): how income is taxed,
+    // or whether an expense is deductible.
+    const taxesOn = getSettings().modules.taxes;
+    const defTreat = DEFAULT_CATEGORIES.find((d) => d.name === c.name)?.tax_treatment
+      || (c.name.toLowerCase() === 'income' ? getSettings().tax.main_income : 'owed');
+    const treatment = el('select', { class: 'cat-kind', title: 'How this income is taxed' },
+      TAX_TREATMENTS.map((x) => el('option', { value: x.value, selected: (c.tax_treatment || defTreat) === x.value ? 'selected' : null }, x.label)));
+    const deductible = el('input', { type: 'checkbox', checked: c.tax_deductible ? 'checked' : null });
+    const deductLabel = el('label', { class: 'rollover-label', title: 'Lowers your tax estimate' }, [deductible, 'tax-deductible']);
+    const syncTax = () => {
+      const isIncome = kind.value === 'income';
+      treatment.style.display = taxesOn && isIncome ? '' : 'none';
+      deductLabel.style.display = taxesOn && !isIncome && kind.value !== 'tax' ? '' : 'none';
+    };
+    kind.addEventListener('change', syncTax);
+    requestAnimationFrame(syncTax);
 
     const row = el('div', { class: 'cat-row' }, [
       el('div', { class: 'cat-fields' }, [
         name,
         el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, CONFIG.BASE_CURRENCY), budget, el('span', { class: 'suffix' }, '/mo')]),
         kind,
+        treatment,
         el('label', { class: 'rollover-label', title: 'Unspent budget carries into next month' }, [rollover, 'roll over']),
+        deductLabel,
       ]),
       el('div', { class: 'cat-actions' }, [
         el('button', { class: 'btn btn-sm btn-primary', onClick: async () => {
@@ -46,6 +65,7 @@ export async function renderCategories() {
             monthly_budget_usd: parseFloat(budget.value) || 0,
             rollover: rollover.checked,
             kind: kind.value,
+            ...(taxesOn ? { tax_treatment: kind.value === 'income' ? treatment.value : null, tax_deductible: kind.value !== 'income' && deductible.checked } : {}),
           };
           if (!patch.name) return toast('Name cannot be empty', 'error');
           await db.updateCategory(c.id, patch);

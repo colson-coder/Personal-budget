@@ -5,7 +5,7 @@
 
 import { db } from './db.js';
 import { CONFIG, DEFAULT_SETTINGS, DEFAULT_CATEGORIES } from './config.js';
-import { simulateFunds } from './finance.js';
+import { simulateFunds, DEFAULT_TAX } from './finance.js';
 import { todayISO } from './util.js';
 
 let settings = structuredClone(DEFAULT_SETTINGS);
@@ -15,6 +15,7 @@ function merge(base, over) {
   out.modules = { ...base.modules, ...(over?.modules || {}) };
   out.plan = { ...base.plan, ...(over?.plan || {}) };
   out.plan.rules = Array.isArray(out.plan.rules) ? out.plan.rules : [];
+  out.tax = { ...DEFAULT_TAX, ...(base.tax || {}), ...(over?.tax || {}) };
   return out;
 }
 
@@ -63,6 +64,7 @@ export async function saveSettings(patch) {
 
 // Category kind with a fallback for categories created before kinds existed.
 const DEFAULT_KIND = new Map(DEFAULT_CATEGORIES.map((c) => [c.name.toLowerCase(), c.kind]));
+const DEFAULT_TREATMENT = new Map(DEFAULT_CATEGORIES.filter((c) => c.tax_treatment).map((c) => [c.name.toLowerCase(), c.tax_treatment]));
 export function kindOf(cat) {
   if (!cat) return 'soft';
   return cat.kind || DEFAULT_KIND.get((cat.name || '').toLowerCase()) || 'soft';
@@ -84,7 +86,10 @@ export async function loadAll() {
     safeList('debts'),
     safeList('income_streams'),
   ]);
-  const catById = new Map(categories.map((c) => [c.id, { ...c, kind: kindOf(c) }]));
+  const catById = new Map(categories.map((c) => [c.id, {
+    ...c, kind: kindOf(c),
+    tax_treatment: c.tax_treatment || DEFAULT_TREATMENT.get((c.name || '').toLowerCase()) || null,
+  }]));
   const todayYM = todayISO().slice(0, 7);
   const sim = simulateFunds({ settings, funds, txs, catById, todayYM });
   return { settings, categories, catById, txs, funds, debts, streams, sim, todayYM };

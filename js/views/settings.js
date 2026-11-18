@@ -12,6 +12,7 @@ import { el, toast, field } from '../util.js';
 import { navigate } from '../router.js';
 
 const METHODS = [
+  { value: 'percent_income', label: '% of all income' },
   { value: 'percent_net', label: '% of net income' },
   { value: 'fixed', label: 'Fixed amount' },
   { value: 'percent_remainder', label: '% of what’s left' },
@@ -102,7 +103,8 @@ function featuresCard(s) {
     el('p', { class: 'muted small hint' }, 'Show only what you use. Hiding a feature keeps its data.'),
     toggle('plan', 'Savings & money plan', 'Funds and monthly allocation rules'),
     toggle('debts', 'Debts & loans', 'Balances, interest, payoff dates'),
-    toggle('income', 'Passive income', 'Rentals, dividends, interest, royalties'),
+    toggle('income', 'Passive income', 'Dividends, interest, side business'),
+    toggle('taxes', 'Taxes', 'Estimate what you owe and what to set aside'),
   ]);
 }
 
@@ -155,7 +157,7 @@ function planCard(s, funds) {
   card.append(
     el('h2', {}, 'Money plan'),
     el('p', { class: 'muted small hint' },
-      'Applied in order: % of net income first, then fixed amounts, then % of what’s left. Anything unassigned stays in your everyday balance.'),
+      'Applied in order: % of all income, % of net income, fixed amounts, then % of what’s left. Anything unassigned stays in your everyday balance.'),
     list,
     el('div', { class: 'rule-actions' }, [
       el('button', {

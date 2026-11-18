@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   addMonths, monthRange, nper, debtLedger, projectDebt, streamLedger,
-  monthSummary, allocate, simulateFunds,
+  monthSummary, allocate, simulateFunds, pmt, minimumPayment, bracketTax, taxSummary, taxYearOf,
 } from '../js/finance.js';
 
 let passed = 0;
@@ -20,14 +20,14 @@ test('month helpers', () => {
 // House loan: $100,000 at 4% from Jun 2026, payments 900/500/600/800/1600,
 // nothing in Nov (prepaid). Spreadsheet: Oct end 97,254.06; Nov 97,578.24;
 // total paid 4,400; interest paid 1,978.24; 316 months left; payoff Mar 2053.
-const loan = { id: 'L', principal: 100000, apr: 4, payment: 500, start_month: '2026-06' };
+const loan = { id: 'L', principal: 100000, apr: 4, payment: 500, start_month: '2026-06', due_day: 20 };
 const loanTx = [
   ['2026-06-15', 900], ['2026-07-15', 500], ['2026-08-15', 600],
   ['2026-09-15', 800], ['2026-10-15', 1600],
 ].map(([date, amount]) => tx({ type: 'expense', date, amount, debt_id: 'L' }));
 
-test('debt ledger matches spreadsheet', () => {
-  const d = debtLedger(loan, loanTx, '2026-11');
+test('debt ledger matches spreadsheet (Nov payment not yet due)', () => {
+  const d = debtLedger(loan, loanTx, '2026-11', 18);
   near(d.rows[0].interest, 333.33);
   near(d.rows[0].end, 99433.33);
   near(d.rows[4].end, 97254.06);
@@ -54,18 +54,32 @@ test('extra payment what-if shortens payoff', () => {
   assert.ok(extra.interest < base.interest);
 });
 
-// Rental: rent 1,500 from May 2026. Received 1500, 1500, 500, 2408, 0.
-// Spreadsheet owed: 0, 0, 1000, 92, 1592. Deposits 300 + 300 = 600.
-test('passive income (rental) ledger matches spreadsheet', () => {
-  const p = { id: 'P', kind: 'rental', expected_monthly: 1500, start_month: '2026-05' };
-  const t = [
-    ['2026-05-03', 1500], ['2026-06-03', 1500], ['2026-07-03', 500], ['2026-08-03', 2408],
-  ].map(([date, amount]) => tx({ type: 'income', date, amount, stream_id: 'P' }));
-  t.push(tx({ type: 'income', date: '2026-05-03', amount: 300, stream_id: 'P', subtype: 'deposit' }));
-  t.push(tx({ type: 'income', date: '2026-06-03', amount: 300, stream_id: 'P', subtype: 'deposit' }));
+test('minimum payment is assumed each month; logged payments replace it', () => {
+  const d = { id: 'C', principal: 10000, apr: 12, payment: 300, start_month: '2026-01' };
+  const t = [tx({ type: 'expense', date: '2026-02-05', amount: 1000, debt_id: 'C' })]; // extra in Feb
+  const l = debtLedger(d, t, '2026-04');
+  assert.deepEqual(l.rows.map((r) => r.status), ['assumed', 'extra', 'assumed', 'assumed']);
+  assert.deepEqual(l.rows.map((r) => r.paid), [300, 1000, 300, 300]);
+  near(l.extraPaid, 700);
+  // Jan: 10000 + 100 − 300 = 9800; Feb: 9800 + 98 − 1000 = 8898
+  near(l.rows[1].end, 8898);
+  const none = debtLedger(d, [], '2026-04');
+  assert.ok(l.balance < none.balance);
+  assert.ok(l.monthsLeft < none.monthsLeft);
+});
+
+test('minimum payment from loan term', () => {
+  near(pmt(0.06 / 12, 360, 200000), 1199.10);
+  near(minimumPayment({ principal: 200000, apr: 6, term_months: 360 }), 1199.10);
+  assert.equal(minimumPayment({ principal: 5000, apr: 5, payment: 150, term_months: 12 }), 150);
+});
+
+test('passive income stream ledger (behind expected)', () => {
+  const p = { id: 'P', kind: 'business', expected_monthly: 1500, start_month: '2026-05' };
+  const t = [['2026-05-03', 1500], ['2026-06-03', 1500], ['2026-07-03', 500], ['2026-08-03', 2408]]
+    .map(([date, amount]) => tx({ type: 'income', date, amount, stream_id: 'P' }));
   const r = streamLedger(p, t, '2026-09');
   assert.deepEqual(r.rows.map((x) => x.behind), [0, 0, 1000, 92, 1592]);
-  assert.equal(r.deposit, 600);
   assert.equal(r.received, 5908);
 });
 
@@ -89,14 +103,13 @@ const rules = [
   { fund_id: 'fun', method: 'fixed', value: 200 },
 ];
 
-test('month summary splits hard / soft / debt; ignores fund & deposit flows', () => {
+test('month summary splits hard / soft / debt; ignores fund flows', () => {
   const t = [
     tx({ type: 'income', date: '2026-11-01', amount: 3000, category_id: 'inc' }),
     tx({ type: 'expense', date: '2026-11-02', amount: 40, category_id: 'bills' }),
     tx({ type: 'expense', date: '2026-11-03', amount: 500, category_id: 'debt', debt_id: 'L' }),
     tx({ type: 'expense', date: '2026-11-04', amount: 260, category_id: 'food' }),
     tx({ type: 'expense', date: '2026-11-05', amount: 99, category_id: 'food', fund_id: 'fun' }), // from fund
-    tx({ type: 'income', date: '2026-11-06', amount: 300, subtype: 'deposit' }),                 // deposit
     tx({ type: 'transfer', date: '2026-11-07', amount: 50, fund_id: 'sav' }),                   // transfer
   ];
   const s = monthSummary('2026-11', t, cats);
@@ -156,6 +169,88 @@ test('income stream without expected amount just totals', () => {
   assert.equal(r.received, 100);
   assert.equal(r.behind, 0);
   near(r.avgMonthly, 16.67);
+});
+
+test('interest only for funds that earn it; logged interest counts', () => {
+  const fs = [
+    { id: 'bank', name: 'Savings', starting_balance: 12000, apy: 6 },                      // auto
+    { id: 'cash', name: 'Pocket', starting_balance: 500, apy: 6, interest_mode: 'none' },  // cash
+    { id: 'cd', name: 'CD', starting_balance: 1000, apy: 5, interest_mode: 'manual' },
+  ];
+  const t = [tx({ type: 'income', date: '2026-01-31', amount: 4.2, fund_id: 'cd', subtype: 'interest' })];
+  const sim = simulateFunds({ settings: { plan: { start_month: '2026-01', rules: [] } }, funds: fs, txs: t, catById: cats, todayYM: '2026-02' });
+  const f = (id) => sim.funds.find((x) => x.fund.id === id);
+  assert.equal(f('bank').balance, 12060);  // 12000 × 6%/12
+  assert.equal(f('cash').balance, 500);    // no interest on cash
+  assert.equal(f('cd').balance, 1004.2);   // only what was logged
+  near(sim.interestByMonth.get('2026-01'), 64.2);
+});
+
+test('percent of income rule (tax set-aside) comes first', () => {
+  const byId = new Map([['tax', { id: 'tax' }], ['give', { id: 'give' }]]);
+  const a = allocate({ income: 4000, net: 1000 }, [
+    { fund_id: 'give', method: 'percent_net', value: 10 },
+    { fund_id: 'tax', method: 'percent_income', value: 20 },
+  ], byId, {});
+  assert.equal(a.lines[0].fund_id, 'tax');
+  assert.equal(a.lines[0].amount, 800);
+  assert.equal(a.remainder, 100);   // 1000 − 800 − 100
+});
+
+test('tax: flat estimate on owed income, minus deductions & payments', () => {
+  const c = new Map([
+    ['pay', { id: 'pay', name: 'Income', kind: 'income' }],                                  // withheld by default
+    ['side', { id: 'side', name: 'Freelance', kind: 'income', tax_treatment: 'owed' }],
+    ['gift', { id: 'gift', name: 'Gifts', kind: 'income', tax_treatment: 'none' }],
+    ['tools', { id: 'tools', name: 'Work tools', kind: 'soft', tax_deductible: true }],
+    ['taxes', { id: 'taxes', name: 'Taxes', kind: 'tax' }],
+  ]);
+  const t = [
+    tx({ type: 'income', date: '2026-01-15', amount: 4000, category_id: 'pay' }),
+    tx({ type: 'income', date: '2026-02-15', amount: 3000, category_id: 'side' }),
+    tx({ type: 'income', date: '2026-02-20', amount: 200, category_id: 'gift' }),
+    tx({ type: 'expense', date: '2026-02-21', amount: 500, category_id: 'tools' }),
+    tx({ type: 'expense', date: '2026-03-10', amount: 300, category_id: 'taxes' }),
+    tx({ type: 'income', date: '2025-12-15', amount: 9999, category_id: 'side' }),          // last tax year
+  ];
+  const s = taxSummary({ tax: { rate: 20 }, txs: t, catById: c, interestByMonth: new Map(), todayYM: '2026-03' });
+  assert.equal(s.income.withheld, 4000);
+  assert.equal(s.income.owed, 3000);
+  assert.equal(s.income.none, 200);
+  assert.equal(s.deductions, 500);
+  assert.equal(s.estimated, 500);          // (3000 − 500) × 20%
+  assert.equal(s.paid, 300);
+  assert.equal(s.remaining, 200);
+  assert.equal(s.projectedYear, 2000);     // pace × 4
+  assert.equal(s.periods.length, 4);
+  assert.equal(s.periods[0].estimated, 500);
+  assert.equal(s.periods[0].paid, 300);
+});
+
+test('tax: brackets charge only the part not covered by withholding', () => {
+  const b = [{ from: 0, rate: 10 }, { from: 10000, rate: 30 }];
+  assert.equal(bracketTax(15000, b), 2500);
+  const c = new Map([['pay', { id: 'pay', name: 'Income', kind: 'income' }], ['side', { id: 'side', name: 'Side', kind: 'income' }]]);
+  const t = [tx({ type: 'income', date: '2026-01-10', amount: 9000, category_id: 'pay' }),
+             tx({ type: 'income', date: '2026-01-11', amount: 3000, category_id: 'side' })];
+  const s = taxSummary({ tax: { mode: 'brackets', brackets: b }, txs: t, catById: c, interestByMonth: new Map(), todayYM: '2026-01' });
+  // all 12000 → 1000 + 600 = 1600; withheld 9000 → 900; owed on side = 700
+  assert.equal(s.estimated, 700);
+});
+
+test('tax projection uses pace since the user started tracking', () => {
+  const c = new Map([['side', { id: 'side', name: 'Freelance', kind: 'income', tax_treatment: 'owed' }]]);
+  const t = [tx({ type: 'income', date: '2026-11-05', amount: 4000, category_id: 'side' })];
+  const s = taxSummary({ tax: { rate: 25 }, txs: t, catById: c, interestByMonth: new Map(), todayYM: '2026-11' });
+  assert.equal(s.estimated, 1000);
+  assert.equal(s.projectedYear, 2000);          // Nov actual + 1 more month (Dec) at the same pace
+  assert.equal(s.periods[0].tracked, false);    // Jan–Mar was before tracking began
+  assert.equal(s.suggestedMonthly, 1000);       // 2000 left over Nov + Dec
+});
+
+test('tax year can start in any month', () => {
+  assert.deepEqual(taxYearOf('2026-03', 4), { start: '2025-04', end: '2026-03', label: '2025–26' });
+  assert.equal(taxYearOf('2026-07', 7).start, '2026-07');
 });
 
 console.log(`\n${passed} tests passed`);

@@ -13,6 +13,7 @@ const ALL = [
   { path: '/funds', label: 'Funds', icon: 'funds', desc: 'Savings, giving, reserves', module: 'plan' },
   { path: '/debts', label: 'Debts', icon: 'debt', desc: 'Loans, payoff dates', module: 'debts' },
   { path: '/income', label: 'Passive income', icon: 'spark', desc: 'Rentals, dividends, more', module: 'income' },
+  { path: '/taxes', label: 'Taxes', icon: 'tax', desc: 'What you owe & what to set aside', module: 'taxes' },
   { path: '/reports', label: 'Reports', icon: 'chart', desc: 'Trends & month in review' },
   { path: '/categories', label: 'Budgets', icon: 'tags', desc: 'Categories & monthly limits' },
   { path: '/import', label: 'Import', icon: 'upload', desc: 'Bring in a bank CSV' },

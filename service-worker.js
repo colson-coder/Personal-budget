@@ -10,7 +10,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v4';
+const CACHE_VERSION = 'pb-shell-v5';
 
 const APP_SHELL = [
   './',
@@ -40,6 +40,7 @@ const APP_SHELL = [
   './js/views/plan.js',
   './js/views/reports.js',
   './js/views/settings.js',
+  './js/views/taxes.js',
   './js/views/setup.js',
   './js/views/transactions.js',
   './icons/icon-192.png',

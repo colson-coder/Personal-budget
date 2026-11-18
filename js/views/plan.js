@@ -37,6 +37,7 @@ export async function renderPlan(params = {}) {
     flowRow('Fixed bills', -s.hard),
     flowRow('Debt payments', -s.debt),
     flowRow('Flexible spending', -s.soft),
+    s.tax ? flowRow('Taxes paid', -s.tax) : null,
     el('div', { class: 'flow-total' }, [
       el('span', {}, 'Net income'),
       el('span', { class: 'flow-total-value ' + (s.net >= 0 ? 'pos' : 'neg') }, fmtUSD(s.net)),
@@ -98,14 +99,14 @@ function flowRow(label, value, tone) {
 // Proportional bar: how income was used.
 function stackBar(s) {
   const parts = [
-    ['hard', s.hard], ['debt', s.debt], ['soft', s.soft], ['net', Math.max(0, s.net)],
+    ['hard', s.hard], ['debt', s.debt], ['soft', s.soft], ['tax', s.tax || 0], ['net', Math.max(0, s.net)],
   ];
-  const total = Math.max(s.income, s.hard + s.debt + s.soft);
+  const total = Math.max(s.income, s.hard + s.debt + s.soft + (s.tax || 0));
   return el('div', { class: 'stack' }, [
     el('div', { class: 'stack-bar' }, parts.filter(([, v]) => v > 0).map(([k, v]) =>
       el('span', { class: `seg-${k}`, style: `width:${(v / total) * 100}%`, title: `${k}: ${fmtUSD(v)}` }))),
     el('div', { class: 'stack-legend' }, [
-      legend('seg-hard', 'Bills'), legend('seg-debt', 'Debt'), legend('seg-soft', 'Flexible'), legend('seg-net', 'Kept'),
+      legend('seg-hard', 'Bills'), legend('seg-debt', 'Debt'), legend('seg-soft', 'Flexible'), s.tax ? legend('seg-tax', 'Tax') : null, legend('seg-net', 'Kept'),
     ]),
   ]);
 }
@@ -121,14 +122,14 @@ function yearCard({ sim, todayYM, txs, settings }, ym) {
   const from = [addMonths(ym, -11), first].sort()[1];
   const months = monthRange(from, ym).filter((m) => m <= todayYM);
   const rows = months.map((m) => ({ ym: m, ...sim.planFor(m).summary }));
-  const active = rows.filter((r) => r.income || r.hard || r.debt || r.soft);
+  const active = rows.filter((r) => r.income || r.hard || r.debt || r.soft || r.tax);
   const sum = (k) => rows.reduce((a, r) => a + r[k], 0);
   const n = Math.max(1, active.length);
 
   const table = el('div', { class: 'ytable' }, [
     el('div', { class: 'yrow yhead' }, ['Month', 'Income', 'Spent', 'Net'].map((h) => el('span', {}, h))),
     ...rows.slice().reverse().map((r) => {
-      const spent = r.hard + r.debt + r.soft;
+      const spent = r.hard + r.debt + r.soft + (r.tax || 0);
       return el('div', { class: 'yrow' + (r.ym === ym ? ' current' : '') }, [
         el('span', {}, shortMonth(r.ym)),
         el('span', {}, r.income ? fmtUSD(r.income) : '—'),
@@ -138,11 +139,11 @@ function yearCard({ sim, todayYM, txs, settings }, ym) {
     }),
     el('div', { class: 'yrow ytotal' }, [
       el('span', {}, 'Total'), el('span', {}, fmtUSD(sum('income'))),
-      el('span', {}, fmtUSD(sum('hard') + sum('debt') + sum('soft'))), el('span', {}, fmtUSD(sum('net'))),
+      el('span', {}, fmtUSD(sum('hard') + sum('debt') + sum('soft') + sum('tax'))), el('span', {}, fmtUSD(sum('net'))),
     ]),
     el('div', { class: 'yrow ytotal muted' }, [
       el('span', {}, 'Monthly avg'), el('span', {}, fmtUSD(sum('income') / n)),
-      el('span', {}, fmtUSD((sum('hard') + sum('debt') + sum('soft')) / n)), el('span', {}, fmtUSD(sum('net') / n)),
+      el('span', {}, fmtUSD((sum('hard') + sum('debt') + sum('soft') + sum('tax')) / n)), el('span', {}, fmtUSD(sum('net') / n)),
     ]),
   ]);
   return el('div', { class: 'card' }, [el('h2', {}, months.length > 1 ? `Last ${months.length} months` : 'Month summary'), table]);
