@@ -825,3 +825,50 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
   .rule-row { grid-template-columns: 1.1fr 1.2fr 1fr 0.9fr; }
 }
 .chip-custom { border-style: dashed; color: var(--text); }
+
+/* =============================================================================
+   HOME — master board
+   ========================================================================== */
+.hero-card { display: grid; gap: 1.1rem; padding: 1.4rem 1.3rem; background: var(--hero-bg); }
+.hero-main { display: flex; flex-direction: column; gap: 0.2rem; }
+.hero-label { font-size: 0.85rem; color: var(--text-dim); font-weight: 600; }
+.hero-value { font-size: 2.6rem; font-weight: var(--num-weight); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--hero-text); }
+.hero-sub { font-size: 0.85rem; color: var(--text-dim); }
+:root[data-theme="bold"] .hero-label, :root[data-theme="bold"] .hero-sub { color: rgba(255, 255, 255, 0.8); }
+.hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.hero-stat { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.hero-stat-label { font-size: 0.75rem; color: var(--text-dim); }
+.hero-stat-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.hero-actions .btn { padding: 0 0.6rem; }
+
+.board-grid { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+.board-tile { margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.board-tile .card-head { margin-bottom: 0.1rem; }
+.board-tile h2 { margin: 0; font-size: 0.95rem; }
+.tile-big { font-size: 1.6rem; font-weight: var(--num-weight); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; font-size: 0.9rem; padding: 0.15rem 0; }
+.tile-row-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tile-row-value { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; text-align: right; }
+.mini-bar-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.mini-bar-row .progress { height: 4px; }
+.tile-note { margin: 0.2rem 0 0; }
+.tile-btn { align-self: flex-start; margin-top: 0.3rem; }
+.upcoming-day.sm { min-width: 1.6rem; height: 1.6rem; font-size: 0.72rem; display: inline-flex; }
+.assign-available { display: flex; justify-content: space-between; align-items: baseline; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 0.9rem; }
+.assign-amt { font-size: 1.4rem; font-weight: var(--num-weight); font-variant-numeric: tabular-nums; }
+
+@media (min-width: 768px) {
+  .board-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-card { grid-template-columns: 1.2fr 1fr; align-items: center; }
+  .hero-actions { grid-column: 1 / -1; grid-template-columns: repeat(3, max-content); }
+  .hero-stats { border-top: 0; padding-top: 0; border-left: 1px solid var(--border); padding-left: 1.2rem; }
+}
+@media (min-width: 1200px) {
+  .board-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.hero-actions .btn { white-space: nowrap; }
+@media (max-width: 767px) {
+  .hero-actions .btn { font-size: 0.88rem; padding: 0 0.4rem; }
+  .wide-only { display: none; }
+}

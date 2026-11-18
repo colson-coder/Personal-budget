@@ -253,4 +253,19 @@ test('tax year can start in any month', () => {
   assert.equal(taxYearOf('2026-07', 7).start, '2026-07');
 });
 
+test('assigning money by hand lowers what is left to assign', () => {
+  const fs = [{ id: 'trip', name: 'Trip' }];
+  const t = [
+    tx({ type: 'income', date: '2026-11-02', amount: 3000, category_id: 'inc' }),
+    tx({ type: 'expense', date: '2026-11-03', amount: 1000, category_id: 'food' }),
+    tx({ type: 'transfer', date: '2026-11-05', amount: 400, fund_id: 'trip' }),
+  ];
+  const sim = simulateFunds({ settings: { plan: { start_month: '2026-11', rules: [] } }, funds: fs, txs: t, catById: cats, todayYM: '2026-11' });
+  const p = sim.planFor('2026-11');
+  assert.equal(p.unallocated, 2000);
+  assert.equal(p.manual, 400);
+  assert.equal(p.leftToAssign, 1600);
+  assert.equal(sim.funds[0].balance, 400);
+});
+
 console.log(`\n${passed} tests passed`);

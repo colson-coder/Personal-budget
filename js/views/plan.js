@@ -53,10 +53,10 @@ export async function renderPlan(params = {}) {
       el('a', { class: 'link', href: '#/settings?section=plan' }, 'Edit plan'),
     ]),
   ]);
-  if (!plan.lines.length) {
+  if (!plan.lines.length && !plan.manual) {
     alloc.append(el('div', { class: 'empty' }, [
       el('p', {}, 'You haven’t set a money plan yet.'),
-      el('p', { class: 'muted small' }, 'Decide once — e.g. “10% to giving, $150 to a business reserve, 25% of what’s left to the emergency fund” — and every month is split for you.'),
+      el('p', { class: 'muted small' }, 'Decide once — e.g. “10% to giving, $150 to a business reserve, 25% of what’s left to the emergency fund” — and every month is split for you. Or assign money by hand from Home.'),
       el('a', { class: 'btn btn-primary btn-sm', href: '#/settings?section=plan' }, 'Set up my plan'),
     ]));
   } else {
@@ -70,12 +70,21 @@ export async function renderPlan(params = {}) {
         el('span', { class: 'alloc-amt' }, fmtUSD(l.amount)),
       ]));
     }
+    if (plan.manual > 0) {
+      alloc.append(el('div', { class: 'alloc-row' }, [
+        el('div', { class: 'rec-main' }, [
+          el('span', { class: 'rec-desc' }, 'Assigned by you'),
+          el('span', { class: 'rec-meta' }, 'Money you moved into funds yourself'),
+        ]),
+        el('span', { class: 'alloc-amt' }, fmtUSD(plan.manual)),
+      ]));
+    }
     alloc.append(el('div', { class: 'flow-total' }, [
       el('span', {}, [
-        'Left unassigned',
-        el('span', { class: 'muted small block' }, s.net < 0 ? 'You spent more than you earned this month' : 'Stays in your everyday balance'),
+        'Left to assign',
+        el('span', { class: 'muted small block' }, s.net < 0 ? 'You spent more than you earned this month' : 'Stays in your everyday balance until you assign it'),
       ]),
-      el('span', { class: 'flow-total-value ' + (plan.unallocated >= 0 ? '' : 'neg') }, fmtUSD(plan.unallocated)),
+      el('span', { class: 'flow-total-value ' + (plan.leftToAssign >= 0 ? '' : 'neg') }, fmtUSD(plan.leftToAssign)),
     ]));
   }
   if (settings.plan.start_month && ym < settings.plan.start_month) {

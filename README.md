@@ -57,9 +57,10 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
   pay, a full-year projection from your pace, how much to set aside monthly,
   and quarter-by-quarter status. A "% of all income" plan rule can fill a Tax
   reserve fund automatically. Estimates only — not tax advice.
-- **Home** — total balance, this month's spend vs. budget per category, plus
-  tiles for whichever features are on (saved in funds, left unassigned, debt
-  remaining, passive income), and the 5 most recent transactions.
+- **Home (master board)** — this month's *left to assign*, income, spent and
+  set aside, with quick actions: add income (e.g. a side hustle), add an
+  expense, and assign money into any fund. Below, one simple tile per area —
+  budgets, funds, debts, taxes, passive income, coming up, recent activity.
 - **Transactions** — full list filterable by date range, category, and
   currency, with inline edit/delete.
 - **Add Transaction** — type, amount, currency, category, date, description.
