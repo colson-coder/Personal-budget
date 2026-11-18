@@ -4,15 +4,19 @@
 // =============================================================================
 
 import { db } from '../db.js';
+import { getSettings } from '../store.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
 
 export async function renderAdd() {
-  const [categories, history] = await Promise.all([
+  const safe = (t) => db.list(t).catch(() => []);
+  const [categories, history, funds, debts, streams] = await Promise.all([
     db.listCategories(),
     db.listTransactions({ limit: 500 }), // for autocomplete + smart suggestions
+    safe('funds'), safe('debts'), safe('income_streams'),
   ]);
+  const mods = getSettings().modules;
 
   const root = el('div', { class: 'view view-add' });
   root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Add transaction')]));
@@ -30,7 +34,7 @@ export async function renderAdd() {
       ? categories.map((c) => el('option', { value: c.id }, c.name))
       : [el('option', { value: '' }, 'No categories — add some first')]);
   const dateInput = el('input', { type: 'date', id: 'f-date', value: todayISO(), max: todayISO(), required: 'required' });
-  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Groceries at Auto Mercado', list: 'desc-suggestions', autocomplete: 'off' });
+  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Weekly groceries', list: 'desc-suggestions', autocomplete: 'off' });
 
   // Smart entry (Cashew-style "title recognition" — a lookup, not ML):
   // autocomplete past descriptions, and when one matches, prefill the
@@ -56,6 +60,45 @@ export async function renderAdd() {
 
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit' }, 'Save transaction');
 
+  // Optional links: pay from a fund, toward a debt, or from an income stream.
+  const opt = (rows, label) => [el('option', { value: '' }, label), ...rows.map((r) => el('option', { value: r.id }, r.name))];
+  const fundSel = el('select', { id: 'f-fund' }, opt(funds, 'No — regular spending'));
+  const debtSel = el('select', { id: 'f-debt' }, opt(debts, 'Not a debt payment'));
+  const streamSel = el('select', { id: 'f-stream' }, opt(streams, 'Not passive income'));
+  debtSel.addEventListener('change', () => {
+    const c = categories.find((x) => x.name === 'Debt Payment');
+    if (debtSel.value && c) categorySel.value = c.id;
+  });
+  streamSel.addEventListener('change', () => {
+    const c = categories.find((x) => x.name === 'Passive Income');
+    if (streamSel.value && c) categorySel.value = c.id;
+  });
+  function moreOptions() {
+    const parts = [];
+    if (mods.plan && funds.length) parts.push(el('div', { class: 'field opt-expense' }, [el('label', { for: 'f-fund' }, 'Paid from a fund?'), fundSel]));
+    if (mods.debts && debts.length) parts.push(el('div', { class: 'field opt-expense' }, [el('label', { for: 'f-debt' }, 'Toward a debt?'), debtSel]));
+    if (mods.income && streams.length) parts.push(el('div', { class: 'field opt-income' }, [el('label', { for: 'f-stream' }, 'From an income stream?'), streamSel]));
+    if (!parts.length) return null;
+    return el('details', { class: 'more-opts' }, [el('summary', {}, 'More options'), ...parts]);
+  }
+  function linkFields(type) {
+    const out = {};
+    if (type === 'expense') {
+      if (fundSel.value) out.fund_id = fundSel.value;
+      if (debtSel.value) out.debt_id = debtSel.value;
+    } else if (streamSel.value) out.stream_id = streamSel.value;
+    return out;
+  }
+  // Show only the options that fit the selected type.
+  const syncOpts = () => {
+    const inc = typeIncome.checked;
+    root.querySelectorAll('.opt-expense').forEach((n) => { n.style.display = inc ? 'none' : ''; });
+    root.querySelectorAll('.opt-income').forEach((n) => { n.style.display = inc ? '' : 'none'; });
+  };
+  typeIncome.addEventListener('change', syncOpts);
+  typeExpense.addEventListener('change', syncOpts);
+  requestAnimationFrame(syncOpts);
+
   const form = el('form', { class: 'card form-card' }, [
     el('div', { class: 'field' }, [
       el('label', {}, 'Type'),
@@ -71,6 +114,7 @@ export async function renderAdd() {
     el('div', { class: 'field' }, [el('label', { for: 'f-category' }, 'Category'), categorySel]),
     el('div', { class: 'field' }, [el('label', { for: 'f-date' }, 'Date'), dateInput]),
     el('div', { class: 'field' }, [el('label', { for: 'f-desc' }, 'Description'), descInput, datalist]),
+    moreOptions(),
     submitBtn,
   ]);
 
@@ -95,6 +139,7 @@ export async function renderAdd() {
       await db.createTransaction({
         type, date, amount, currency, amount_usd, exchange_rate,
         category_id, description: descInput.value.trim(),
+        ...linkFields(type),
       });
       localStorage.setItem('pb_last_currency', currency);
       // Stay on the page for rapid entry: clear amount/description, keep
@@ -102,6 +147,7 @@ export async function renderAdd() {
       toast('Saved — add another or head to the dashboard', 'success');
       amountInput.value = '';
       descInput.value = '';
+      fundSel.value = ''; debtSel.value = ''; streamSel.value = '';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Save transaction';
       amountInput.focus();

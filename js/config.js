@@ -13,6 +13,9 @@
 // =============================================================================
 
 export const CONFIG = {
+  // Product name shown in the UI, manifest and page title. Change once to rebrand.
+  APP_NAME: 'Personal Budget',
+
   // --- Supabase ---------------------------------------------------------------
   // Fill these in from: Supabase Dashboard → Project Settings → API.
   SUPABASE_URL: 'https://YOUR-PROJECT-ref.supabase.co',
@@ -26,27 +29,60 @@ export const CONFIG = {
 
   // Currencies the app can log. Add more here later — nothing else hard-codes
   // this list. USD is the base/reference currency for all stored balances.
+  // Replaced at boot by the currencies chosen in setup (Settings → Currencies).
   CURRENCIES: ['USD', 'EUR', 'GBP', 'CRC'],
 
+  // Defaults only — every user picks their own home currency and timezone in
+  // setup (stored in their settings and applied at boot by store.js).
   BASE_CURRENCY: 'USD',
 
-  // All "this month" / date-boundary logic uses this fixed local calendar.
-  // Locked globally so the same transaction belongs to the same month on every
-  // device, regardless of where you physically are.
-  TIMEZONE: 'America/Costa_Rica', // UTC-6
+  // All "this month" / date-boundary logic uses the user's chosen timezone, so
+  // the same transaction belongs to the same month on every device.
+  TIMEZONE: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
 };
 
-// Predefined categories seeded on first use. monthly_budget_usd is editable.
-export const DEFAULT_CATEGORIES = [
-  { name: 'Food & Dining', monthly_budget_usd: 0 },
-  { name: 'Transport', monthly_budget_usd: 0 },
-  { name: 'Housing/Rent', monthly_budget_usd: 0 },
-  { name: 'Utilities', monthly_budget_usd: 0 },
-  { name: 'Shopping', monthly_budget_usd: 0 },
-  { name: 'Entertainment', monthly_budget_usd: 0 },
-  { name: 'Travel', monthly_budget_usd: 0 },
-  { name: 'Health', monthly_budget_usd: 0 },
-  { name: 'Subscriptions', monthly_budget_usd: 0 },
-  { name: 'Income', monthly_budget_usd: 0 },
-  { name: 'Other', monthly_budget_usd: 0 },
+// Currencies a user can pick during setup. USD stays the reference currency
+// for all totals. Keyless preview rates exist for these (see rates.js); any
+// other code needs an ExchangeRate-API key.
+export const SUPPORTED_CURRENCIES = [
+  'USD', 'EUR', 'GBP', 'CRC', 'MXN', 'CAD', 'AUD', 'JPY', 'CHF', 'COP', 'BRL', 'INR',
 ];
+
+// Predefined categories seeded on first use. `kind` drives the money plan:
+//   hard   = fixed bills / needs        soft = flexible spending
+//   debt   = loan & card payments       income = money in
+export const DEFAULT_CATEGORIES = [
+  { name: 'Housing/Rent', kind: 'hard', monthly_budget_usd: 0 },
+  { name: 'Utilities', kind: 'hard', monthly_budget_usd: 0 },
+  { name: 'Subscriptions', kind: 'hard', monthly_budget_usd: 0 },
+  { name: 'Insurance', kind: 'hard', monthly_budget_usd: 0 },
+  { name: 'Food & Dining', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Transport', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Shopping', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Entertainment', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Travel', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Health', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Giving', kind: 'soft', monthly_budget_usd: 0 },
+  { name: 'Debt Payment', kind: 'debt', monthly_budget_usd: 0 },
+  { name: 'Income', kind: 'income', monthly_budget_usd: 0 },
+  { name: 'Passive Income', kind: 'income', monthly_budget_usd: 0 },
+  { name: 'Other', kind: 'soft', monthly_budget_usd: 0 },
+];
+
+export const CATEGORY_KINDS = [
+  { value: 'hard', label: 'Fixed bill' },
+  { value: 'soft', label: 'Flexible' },
+  { value: 'debt', label: 'Debt payment' },
+  { value: 'income', label: 'Income' },
+];
+
+// Per-user preferences (stored via db.getSettings/saveSettings).
+export const DEFAULT_SETTINGS = {
+  setup_done: false,
+  name: '',
+  currencies: ['USD'],
+  base_currency: 'USD',
+  timezone: null,                     // null → device timezone
+  modules: { plan: true, debts: false, income: false },
+  plan: { start_month: null, rules: [] },
+};

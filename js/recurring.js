@@ -78,6 +78,11 @@ export async function applyRecurring() {
           exchange_rate,
           category_id: rule.category_id,
           description: rule.description || '(recurring)',
+          // Links carry through so auto-logged loan payments, passive income and fund
+          // contributions land in the right ledger.
+          ...(rule.debt_id ? { debt_id: rule.debt_id } : {}),
+          ...(rule.fund_id ? { fund_id: rule.fund_id } : {}),
+          ...(rule.stream_id ? { stream_id: rule.stream_id } : {}),
         });
         lastDone = ym;
         created++;

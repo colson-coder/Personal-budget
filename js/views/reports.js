@@ -33,8 +33,8 @@ export async function renderReports() {
     let m = months.get(ym);
     if (!m) months.set(ym, (m = { income: 0, expense: 0, byCat: new Map() }));
     const v = Number(t.amount_usd) || 0;
-    if (t.type === 'income') m.income += v;
-    else {
+    if (t.type === 'income') { if (t.subtype !== 'deposit') m.income += v; }
+    else if (t.type === 'expense' && t.subtype !== 'deposit') {
       m.expense += v;
       m.byCat.set(t.category_id, (m.byCat.get(t.category_id) || 0) + v);
     }
@@ -76,7 +76,7 @@ function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
 
   // Largest single expense this month
   const biggest = allTx
-    .filter((t) => t.type === 'expense' && t.date.slice(0, 7) === thisMonth)
+    .filter((t) => t.type === 'expense' && t.subtype !== 'deposit' && t.date.slice(0, 7) === thisMonth)
     .sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0))[0];
   if (biggest) {
     card.append(stat('Largest expense', fmtUSD(biggest.amount_usd),

@@ -177,6 +177,52 @@ const supabaseBackend = {
     if (error) throw error;
   },
 
+  // --- generic tables: funds, debts, income_streams -----------------------------
+  async list(table) {
+    const client = await sb();
+    const { data, error } = await client.from(table).select('*').order('created_at');
+    if (error) throw error;
+    return data;
+  },
+
+  async create(table, row) {
+    const client = await sb();
+    const user = await this.requireUser();
+    const { data, error } = await client.from(table).insert({ ...row, user_id: user.id }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(table, id, patch) {
+    const client = await sb();
+    const { data, error } = await client.from(table).update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async remove(table, id) {
+    const client = await sb();
+    const { error } = await client.from(table).delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- settings (one JSON document per user) -----------------------------------
+  async getSettings() {
+    const client = await sb();
+    const { data, error } = await client.from('settings').select('data').maybeSingle();
+    if (error) throw error;
+    return data?.data || null;
+  },
+
+  async saveSettings(settings) {
+    const client = await sb();
+    const user = await this.requireUser();
+    const { error } = await client.from('settings')
+      .upsert({ user_id: user.id, data: settings, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    return settings;
+  },
+
   async restoreAll() {
     throw new Error('Restore is only available in local mode. Use CSV import instead.');
   },
@@ -257,6 +303,9 @@ const supabaseBackend = {
 const LS_TX = 'pb_local_transactions';
 const LS_CAT = 'pb_local_categories';
 const LS_REC = 'pb_local_recurring';
+const LS_SETTINGS = 'pb_local_settings';
+const LS_PREFIX = 'pb_local_';           // + 'funds' | 'debts' | 'income_streams'
+export const TABLES = ['funds', 'debts', 'income_streams'];
 
 function lsRead(key) {
   try {
@@ -382,10 +431,48 @@ const localBackend = {
 
   // Replace ALL local data with a JSON backup (export from the Categories
   // page). Local mode only — synced accounts restore via CSV import instead.
+  // --- generic tables: funds, debts, income_streams -----------------------------
+  async list(table) {
+    return lsRead(LS_PREFIX + table);
+  },
+
+  async create(table, row) {
+    const rows = lsRead(LS_PREFIX + table);
+    const created = { id: uid(), created_at: new Date().toISOString(), ...row, user_id: 'local-user' };
+    rows.push(created);
+    lsWrite(LS_PREFIX + table, rows);
+    return created;
+  },
+
+  async update(table, id, patch) {
+    const rows = lsRead(LS_PREFIX + table);
+    const i = rows.findIndex((r) => r.id === id);
+    if (i === -1) throw new Error('Not found');
+    rows[i] = { ...rows[i], ...patch };
+    lsWrite(LS_PREFIX + table, rows);
+    return rows[i];
+  },
+
+  async remove(table, id) {
+    lsWrite(LS_PREFIX + table, lsRead(LS_PREFIX + table).filter((r) => r.id !== id));
+  },
+
+  async getSettings() {
+    try { return JSON.parse(localStorage.getItem(LS_SETTINGS) || 'null'); } catch { return null; }
+  },
+
+  async saveSettings(settings) {
+    localStorage.setItem(LS_SETTINGS, JSON.stringify(settings));
+    return settings;
+  },
+
   async restoreAll(data) {
-    lsWrite(LS_CAT, Array.isArray(data.categories) ? data.categories : []);
-    lsWrite(LS_TX, Array.isArray(data.transactions) ? data.transactions : []);
-    lsWrite(LS_REC, Array.isArray(data.recurring) ? data.recurring : []);
+    const arr = (x) => (Array.isArray(x) ? x : []);
+    lsWrite(LS_CAT, arr(data.categories));
+    lsWrite(LS_TX, arr(data.transactions));
+    lsWrite(LS_REC, arr(data.recurring));
+    for (const t of TABLES) lsWrite(LS_PREFIX + t, arr(data[t]));
+    if (data.settings) localStorage.setItem(LS_SETTINGS, JSON.stringify(data.settings));
   },
 
   async seedDefaultCategories() {

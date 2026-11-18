@@ -1,12 +1,13 @@
 // =============================================================================
-// rates.js — Exchange-rate fetching and conversion to USD.
+// rates.js — Exchange-rate fetching and conversion to the home currency.
 //
 // Provider: ExchangeRate-API (https://www.exchangerate-api.com).
 // We use this provider (rather than the keyless Frankfurter/ECB) because our
 // currency list includes CRC (Costa Rican colón), which is outside the ECB set.
 //
-// Rate semantics: every rate we store and use is "USD per 1 unit of <currency>",
-// i.e. amount_usd = amount * exchange_rate. For USD itself the rate is always 1.
+// Rate semantics: every rate we store is "home currency per 1 unit of
+// <currency>", i.e. amount_usd = amount * exchange_rate (amount_usd = amount in
+// home currency). For the home currency itself the rate is always 1.
 //
 // IMPORTANT design points (see build spec):
 //  - We fetch the rate for the TRANSACTION'S OWN DATE, not today's, so backdated
@@ -20,7 +21,7 @@
 import { CONFIG } from './config.js';
 import { todayISO } from './util.js';
 
-const CACHE_KEY = 'pb_rate_cache_v1';
+const CACHE_KEY = 'pb_rate_cache_v2';
 const BASE = 'https://v6.exchangerate-api.com/v6';
 
 // Approximate USD-per-1-unit rates used ONLY for keyless preview, i.e. while
@@ -28,7 +29,10 @@ const BASE = 'https://v6.exchangerate-api.com/v6';
 // this is never used and all rates come live from the provider. These let you
 // demo the app end-to-end (add transactions, see the dashboard populate) before
 // signing up for anything.
-const FALLBACK_RATES = { USD: 1, EUR: 1.08, GBP: 1.27, CRC: 0.00188 };
+const FALLBACK_RATES = {
+  USD: 1, EUR: 1.08, GBP: 1.27, CRC: 0.00188, MXN: 0.055, CAD: 0.73,
+  AUD: 0.66, JPY: 0.0067, CHF: 1.12, COP: 0.00025, BRL: 0.18, INR: 0.012,
+};
 
 function keyConfigured() {
   const k = CONFIG.EXCHANGE_RATE_API_KEY || '';
@@ -54,18 +58,20 @@ function persistCache() {
   }
 }
 
+const base = () => CONFIG.BASE_CURRENCY;
+
 function cacheGet(date, currency) {
-  return memCache.get(`${date}:${currency}`);
+  return memCache.get(`${date}:${currency}:${base()}`);
 }
 
 function cacheSet(date, currency, rate) {
-  memCache.set(`${date}:${currency}`, rate);
+  memCache.set(`${date}:${currency}:${base()}`, rate);
   persistCache();
 }
 
-// Fetch "USD per 1 <currency>" for an arbitrary historical date.
+// Fetch "home currency per 1 <currency>" for an arbitrary historical date.
 // ExchangeRate-API's history endpoint returns conversion_rates keyed by target
-// code, expressed as "target per 1 base". With base = <currency>, the USD entry
+// code, expressed as "target per 1 base". With base = <currency>, the home-currency entry
 // is exactly the number we want.
 //
 // NOTE: the /history endpoint requires a paid ExchangeRate-API plan. On the free
@@ -79,14 +85,14 @@ async function fetchHistorical(currency, date) {
   if (!res.ok) throw new Error(`history HTTP ${res.status}`);
   const data = await res.json();
   if (data.result !== 'success') throw new Error(data['error-type'] || 'history failed');
-  const rate = data.conversion_rates?.USD;
-  if (typeof rate !== 'number') throw new Error('history missing USD rate');
+  const rate = data.conversion_rates?.[base()];
+  if (typeof rate !== 'number') throw new Error(`history missing ${base()} rate`);
   return rate;
 }
 
-// Fetch the latest "USD per 1 <currency>" via the pair endpoint.
+// Fetch the latest "home currency per 1 <currency>" via the pair endpoint.
 async function fetchLatestPair(currency) {
-  const url = `${BASE}/${CONFIG.EXCHANGE_RATE_API_KEY}/pair/${currency}/USD`;
+  const url = `${BASE}/${CONFIG.EXCHANGE_RATE_API_KEY}/pair/${currency}/${base()}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`pair HTTP ${res.status}`);
   const data = await res.json();
@@ -96,10 +102,10 @@ async function fetchLatestPair(currency) {
   return rate;
 }
 
-// Public: resolve the USD-per-1-<currency> rate for a given currency on a given
+// Public: resolve the home-currency-per-1-<currency> rate for a given currency on a given
 // ISO date. Caches the result. Throws if no rate can be obtained at all.
 export async function getRate(currency, date = todayISO()) {
-  if (currency === 'USD') return 1;
+  if (currency === base()) return 1;
 
   const cached = cacheGet(date, currency);
   if (typeof cached === 'number') return cached;
@@ -108,7 +114,9 @@ export async function getRate(currency, date = todayISO()) {
   // so the app is fully demoable before an API key is configured. Unsupported
   // currencies get a clear error instead of a doomed API call.
   if (!keyConfigured()) {
-    const fb = FALLBACK_RATES[currency];
+    // Cross rate through USD: (USD per 1 currency) / (USD per 1 home currency).
+    const fb = FALLBACK_RATES[currency] && FALLBACK_RATES[base()]
+      ? FALLBACK_RATES[currency] / FALLBACK_RATES[base()] : undefined;
     if (typeof fb === 'number') {
       cacheSet(date, currency, fb);
       return fb;
@@ -134,20 +142,25 @@ export async function getRate(currency, date = todayISO()) {
   }
 
   if (typeof rate !== 'number' || !isFinite(rate) || rate <= 0) {
-    throw new Error(`Could not obtain a valid ${currency}→USD rate for ${date}`);
+    throw new Error(`Could not obtain a valid ${currency}→${base()} rate for ${date}`);
   }
 
   cacheSet(date, currency, rate);
   return rate;
 }
 
-// Public: convert an amount in `currency` on `date` to USD.
+// Public: convert an amount in `currency` on `date` to the user's home
+// currency (CONFIG.BASE_CURRENCY, chosen in setup). The stored field keeps its
+// historical name `amount_usd`; it means "amount in home currency".
 // Returns { amount_usd, exchange_rate }. Throws on failure so callers can block
 // the save with a clear error instead of storing a wrong conversion.
-export async function convertToUSD(amount, currency, date) {
+export async function convertToBase(amount, currency, date) {
   const rate = await getRate(currency, date);
   return {
     exchange_rate: rate,
     amount_usd: Math.round(Number(amount) * rate * 100) / 100,
   };
 }
+
+// Backwards-compatible name used across the views.
+export const convertToUSD = convertToBase;

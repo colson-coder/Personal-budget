@@ -1,32 +1,60 @@
 # Personal Budget
 
-A multi-currency personal finance tracker. It's a static site (vanilla
-HTML/CSS/JS, **no build step**) hosted on GitHub Pages, backed by
-[Supabase](https://supabase.com) for storage + auth, and installable as a
-standalone **PWA** on macOS (Dock) and iPhone (Home Screen) — syncing across
-devices.
+A complete personal finance tracker that **adapts to whoever uses it**. A short
+setup asks a few plain questions — home currency, timezone, what you want to
+track, how you split your money — and the app builds itself around the
+answers. Everything stays editable in Settings.
 
-- **Currencies:** USD, EUR, GBP, CRC (add more in `js/config.js`).
-- **Base/reference currency:** USD — all balances and budgets are in USD.
-- **Rate provider:** [ExchangeRate-API](https://www.exchangerate-api.com)
-  (required because CRC is outside the ECB/Frankfurter set).
-- **Timezone:** all month-boundary logic uses `America/Costa_Rica` (UTC-6),
-  locked globally so a transaction belongs to the same calendar month on every
-  device.
+It's a static site (vanilla HTML/CSS/JS, **no build step**) hosted on GitHub
+Pages, backed by [Supabase](https://supabase.com) for accounts and sync, and
+installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
+
+- **Any home currency** — totals, budgets and reports use the currency each
+  user picks; transactions can be in any other currency and are converted at
+  the rate for their own date ([ExchangeRate-API](https://www.exchangerate-api.com),
+  with approximate built-in rates until a key is added).
+- **Their own calendar** — month boundaries follow the timezone chosen in setup
+  (defaults to the device's), so a transaction lands in the same month on
+  every device.
+- **Only what they use** — features are switched on per user; hidden features
+  keep their data.
+- Rebrand by changing `APP_NAME` in `js/config.js` (plus `manifest.webmanifest`).
 
 ---
 
 ## Features
 
-- **Dashboard** — total balance in USD, this month's spend vs. budget per
-  category (progress bars), total spend this month, and the 5 most recent
-  transactions.
+- **Setup wizard** — first launch asks for name, home currency (guessed from
+  the device region), other currencies, timezone, which features to enable,
+  and a money plan; then creates the user's funds, rules, first debt and first
+  income stream. Can be re-run from Settings.
+- **Money plan** — rules that split each month's net income
+  (income − fixed bills − debt payments − flexible spending) into funds:
+  *% of net income* (e.g. 10% giving), *fixed amounts* (e.g. a business
+  reserve), and *% of what's left* with a different % once a fund's goal is
+  reached (e.g. 25% to the emergency fund until it hits its goal). The Plan
+  page shows cash flow, where every dollar goes, and a month-by-month table.
+- **Funds** — emergency fund, giving, reserves, spending money: balances grow
+  from the plan, deposits and interest (APY, credited monthly) and shrink when
+  you spend from them. Goals, progress bars and balance sparklines.
+- **Debts** — loans, mortgages, cards: monthly amortization ledger from logged
+  payments, % paid off, interest paid, months left and payoff date, a warning
+  when payments don't cover interest, and a "what if I paid extra?" slider.
+  Payments can repeat automatically.
+- **Passive income** — rentals, dividends, interest, royalties, side
+  businesses: received this month / last 12 months / average, behind or ahead
+  of an expected amount, and (rentals only) security deposits held.
+- **Home** — total balance, this month's spend vs. budget per category, plus
+  tiles for whichever features are on (saved in funds, left unassigned, debt
+  remaining, passive income), and the 5 most recent transactions.
 - **Transactions** — full list filterable by date range, category, and
   currency, with inline edit/delete.
 - **Add Transaction** — type, amount, currency, category, date, description.
-  Converts to USD at the **transaction's own date** and stores the original
-  amount, the USD equivalent, and the exact rate used.
-- **Categories & Budgets** — editable list with monthly USD budgets.
+  Converts to the home currency at the **transaction's own date** and stores
+  the original amount, the converted amount, and the exact rate used.
+  "More options" links it to a fund, a debt or an income stream.
+- **Categories & Budgets** — editable list with monthly budgets; each category
+  has a kind (fixed bill, flexible, debt payment, income) that drives the plan.
 - **Recurring transactions (auto-tracking)** — set rent, salary, or
   subscriptions once (on the Add page) and the app records them automatically
   every month on their day, catching up any months missed while the app was
@@ -67,19 +95,22 @@ devices.
 ├── css/
 │   └── styles.css            # Dark theme, mobile-first responsive layout
 ├── js/
-│   ├── config.js             # Supabase + API keys, currency list, timezone
+│   ├── config.js             # App name, Supabase + API keys, defaults
 │   ├── db.js                 # SINGLE data-access layer (Supabase OR localStorage)
-│   ├── rates.js              # Exchange-rate fetch + cache + USD conversion
+│   ├── store.js              # Per-user settings + one-call data loading
+│   ├── finance.js            # Pure calculation engine (plan, funds, debts, income)
+│   ├── rates.js              # Exchange rates → home currency, cached
+│   ├── recurring.js          # Auto-applies recurring transactions on launch
+│   ├── nav.js / icons.js     # Adaptive navigation + SVG icon set
 │   ├── router.js             # Tiny hash router
-│   ├── util.js               # Date/timezone, money formatting, DOM helpers
-│   ├── app.js                # Bootstrap, nav chrome, local-mode banner
+│   ├── util.js               # Dates, money formatting, DOM + sheet helpers
+│   ├── app.js                # Bootstrap: auth → setup wizard → app shell
 │   └── views/                # One module per page
-│       ├── auth.js
-│       ├── dashboard.js
-│       ├── transactions.js
-│       ├── add.js
-│       ├── categories.js
-│       └── import.js
+│       ├── setup.js  settings.js  auth.js
+│       ├── dashboard.js  transactions.js  add.js  reports.js
+│       ├── plan.js  funds.js  debts.js  income.js
+│       └── categories.js  import.js  more.js
+├── tests/finance.test.mjs    # Engine tests: node tests/finance.test.mjs
 ├── icons/                    # PWA icons (192, 512, 180 apple-touch)
 └── sql/
     ├── schema.sql            # Tables
@@ -98,9 +129,8 @@ exact same UI code.
 
 1. Sign up at [supabase.com](https://supabase.com) and create a new project.
 2. In **SQL Editor**, run [`sql/schema.sql`](sql/schema.sql), then
-   [`sql/rls.sql`](sql/rls.sql) (in that order). Already ran them before the
-   `recurring` table existed? Re-run both — they're idempotent
-   (`create table if not exists` / `drop policy if exists`).
+   [`sql/rls.sql`](sql/rls.sql) (in that order). Ran them before? Re-run
+   both after updating — they're idempotent and add any new tables/columns.
 3. In **Project Settings → API**, copy your **Project URL** and **anon public
    key**.
 

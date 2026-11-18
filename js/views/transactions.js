@@ -82,8 +82,8 @@ export async function renderTransactions() {
       el('div', { class: 'txr-cell', dataset: { label: 'Category' } }, cat?.name ?? '—'),
       el('div', { class: 'txr-cell', dataset: { label: 'Amount' } },
         `${Number(t.amount).toLocaleString()} ${t.currency}`),
-      el('div', { class: 'txr-cell txr-usd ' + (t.type === 'income' ? 'pos' : 'neg'), dataset: { label: 'USD' } },
-        (t.type === 'income' ? '+' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0))),
+      el('div', { class: 'txr-cell txr-usd ' + (t.type === 'income' ? 'pos' : t.type === 'transfer' ? '' : 'neg'), dataset: { label: CONFIG.BASE_CURRENCY } },
+        (t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0))),
       el('div', { class: 'txr-cell txr-actions' }, [
         el('button', { class: 'icon-btn', title: 'Edit', onClick: () => row.replaceWith(editView(t)) }, '✎'),
         el('button', { class: 'icon-btn', title: 'Delete', onClick: async () => {
@@ -108,6 +108,7 @@ export async function renderTransactions() {
     const type = el('select', {}, [
       el('option', { value: 'expense', selected: t.type === 'expense' ? 'selected' : null }, 'Expense'),
       el('option', { value: 'income', selected: t.type === 'income' ? 'selected' : null }, 'Income'),
+      t.type === 'transfer' ? el('option', { value: 'transfer', selected: 'selected' }, 'Transfer to fund') : null,
     ]);
     const desc = el('input', { type: 'text', value: t.description || '' });
 

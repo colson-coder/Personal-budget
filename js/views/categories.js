@@ -3,7 +3,9 @@
 // Add / edit / delete.
 // =============================================================================
 
-import { db, isLocalMode } from '../db.js';
+import { db, isLocalMode, TABLES } from '../db.js';
+import { CATEGORY_KINDS, CONFIG } from '../config.js';
+import { kindOf } from '../store.js';
 import { el, fmtUSD, toast } from '../util.js';
 
 export async function renderCategories() {
@@ -27,11 +29,14 @@ export async function renderCategories() {
     const budget = el('input', { type: 'number', min: '0', step: '1', value: Number(c.monthly_budget_usd) || 0, class: 'cat-budget', inputmode: 'decimal' });
     // Envelope rollover: unspent budget carries into next month (YNAB-style).
     const rollover = el('input', { type: 'checkbox', class: 'cat-rollover', checked: c.rollover ? 'checked' : null });
+    const kind = el('select', { class: 'cat-kind', title: 'How this category counts in your plan' },
+      CATEGORY_KINDS.map((k) => el('option', { value: k.value, selected: kindOf(c) === k.value ? 'selected' : null }, k.label)));
 
     const row = el('div', { class: 'cat-row' }, [
       el('div', { class: 'cat-fields' }, [
         name,
-        el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, '$'), budget, el('span', { class: 'suffix' }, '/mo')]),
+        el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, CONFIG.BASE_CURRENCY), budget, el('span', { class: 'suffix' }, '/mo')]),
+        kind,
         el('label', { class: 'rollover-label', title: 'Unspent budget carries into next month' }, [rollover, 'roll over']),
       ]),
       el('div', { class: 'cat-actions' }, [
@@ -40,6 +45,7 @@ export async function renderCategories() {
             name: name.value.trim(),
             monthly_budget_usd: parseFloat(budget.value) || 0,
             rollover: rollover.checked,
+            kind: kind.value,
           };
           if (!patch.name) return toast('Name cannot be empty', 'error');
           await db.updateCategory(c.id, patch);
@@ -63,7 +69,7 @@ export async function renderCategories() {
     el('h2', {}, 'Add category'),
     el('div', { class: 'cat-fields' }, [
       newName,
-      el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, '$'), newBudget, el('span', { class: 'suffix' }, '/mo')]),
+      el('div', { class: 'cat-budget-wrap' }, [el('span', { class: 'prefix' }, CONFIG.BASE_CURRENCY), newBudget, el('span', { class: 'suffix' }, '/mo')]),
     ]),
     el('button', { class: 'btn btn-primary', onClick: async () => {
       const name = newName.value.trim();
@@ -83,7 +89,7 @@ export async function renderCategories() {
 
 // --- Your data: export & restore -----------------------------------------------
 // The lesson of Mint shutting down: always be able to walk away with your data.
-function dataCard() {
+export function dataCard() {
   const card = el('div', { class: 'card' }, [
     el('h2', {}, 'Your data'),
     el('p', { class: 'muted hint' },
@@ -125,16 +131,19 @@ function dataCard() {
 }
 
 async function exportAll(format) {
-  const [categories, transactions, recurring] = await Promise.all([
+  const [categories, transactions, recurring, settings, ...extra] = await Promise.all([
     db.listCategories(),
     db.listTransactions(),
     db.listRecurring().catch(() => []),
+    db.getSettings().catch(() => null),
+    ...TABLES.map((t) => db.list(t).catch(() => [])),
   ]);
+  const tables = Object.fromEntries(TABLES.map((t, i) => [t, extra[i]]));
   const stamp = new Date().toISOString().slice(0, 10);
 
   if (format === 'json') {
     const blob = new Blob(
-      [JSON.stringify({ exported_at: new Date().toISOString(), categories, transactions, recurring }, null, 2)],
+      [JSON.stringify({ exported_at: new Date().toISOString(), settings, categories, transactions, recurring, ...tables }, null, 2)],
       { type: 'application/json' });
     download(blob, `personal-budget-backup-${stamp}.json`);
   } else {

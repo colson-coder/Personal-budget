@@ -1,13 +1,16 @@
 // =============================================================================
-// dashboard.js — Total balance (USD), a month's spend vs budget per category,
+// dashboard.js — Total balance (home currency), a month's spend vs budget per category,
 // total spend that month, and the 5 most recent transactions. Use ←/→ to view
 // past months (?month=YYYY-MM query param).
 // =============================================================================
 
 import { db } from '../db.js';
 import { getRate } from '../rates.js';
+import { CONFIG } from '../config.js';
 import { el, fmtUSD, monthBounds, todayISO, monthLabel, nextMonthYM, prevMonthYM } from '../util.js';
 import { navigate } from '../router.js';
+import { loadAll } from '../store.js';
+import { debtLedger, streamLedger } from '../finance.js';
 
 export async function renderDashboard(params = {}) {
   const [categories, allTx] = await Promise.all([
@@ -25,7 +28,7 @@ export async function renderDashboard(params = {}) {
   let income = 0, expense = 0;
   for (const t of allTx) {
     if (t.type === 'income') income += Number(t.amount_usd) || 0;
-    else expense += Number(t.amount_usd) || 0;
+    else if (t.type === 'expense') expense += Number(t.amount_usd) || 0; // transfers move money between funds
   }
   const balance = income - expense;
 
@@ -65,6 +68,10 @@ export async function renderDashboard(params = {}) {
     summaryCard('Income (all time)', fmtUSD(income), 'pos'),
     summaryCard(isCurrent ? 'Spent this month' : `Spent in ${monthLabel(ym)}`, fmtUSD(monthTotal), 'neg'),
   ]));
+
+  // Adaptive overview: only the features this user turned on.
+  const overview = await overviewStrip(ym);
+  if (overview) root.append(overview);
 
   // Budgets
   const budgetCats = categories
@@ -147,10 +154,10 @@ export async function renderDashboard(params = {}) {
           el('span', { class: 'tx-desc' }, t.description || (cat?.name ?? 'Transaction')),
           el('span', { class: 'tx-meta' }, `${cat?.name ?? 'Uncategorized'} · ${t.date}`),
         ]),
-        el('div', { class: 'tx-amt ' + (t.type === 'income' ? 'pos' : 'neg') }, [
-          (t.type === 'income' ? '+' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0)),
+        el('div', { class: 'tx-amt ' + (t.type === 'income' ? 'pos' : t.type === 'transfer' ? '' : 'neg') }, [
+          (t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0)),
           el('span', { class: 'tx-orig' },
-            t.currency !== 'USD' ? `${Number(t.amount).toLocaleString()} ${t.currency}` : ''),
+            t.currency !== CONFIG.BASE_CURRENCY ? `${Number(t.amount).toLocaleString()} ${t.currency}` : ''),
         ]),
       ]));
     }
@@ -246,4 +253,29 @@ async function upcomingCard(balance, catById) {
       el('span', { class: 'stat-value ' + (projected >= 0 ? 'pos' : 'neg') }, fmtUSD(projected)),
     ]),
   ]);
+}
+
+async function overviewStrip(ym) {
+  const d = await loadAll();
+  const m = d.settings.modules;
+  const tiles = [];
+  const tile = (label, value, href, tone) => el('a', { class: 'card summary-card ov-tile', href }, [
+    el('div', { class: 'summary-label' }, label),
+    el('div', { class: 'summary-value ' + (tone || '') }, value),
+  ]);
+  if (m.plan) {
+    tiles.push(tile('Saved in funds', fmtUSD(d.sim.total), '#/funds', 'pos'));
+    const p = d.sim.planFor(ym);
+    if (p.lines.length) tiles.push(tile('Left unassigned', fmtUSD(p.unallocated), `#/plan?month=${ym}`, p.unallocated < 0 ? 'neg' : ''));
+  }
+  if (m.debts && d.debts.length) {
+    const owed = d.debts.reduce((a, x) => a + debtLedger(x, d.txs, d.todayYM).balance, 0);
+    tiles.push(tile('Debt remaining', fmtUSD(owed), '#/debts', 'neg'));
+  }
+  if (m.income && d.streams.length) {
+    const inc = d.streams.reduce((a, x) => a + streamLedger(x, d.txs, d.todayYM).thisMonth, 0);
+    tiles.push(tile('Passive income this month', fmtUSD(inc), '#/income', 'pos'));
+  }
+  if (!tiles.length) return null;
+  return el('div', { class: 'grid cards-ov' }, tiles);
 }
