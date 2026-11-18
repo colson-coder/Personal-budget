@@ -23,6 +23,7 @@ export async function renderTransactions() {
     ...categories.map((c) => el('option', { value: c.id }, c.name))]);
   const fCur = el('select', {}, [el('option', { value: '' }, 'All currencies'),
     ...CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c))]);
+  const fSearch = el('input', { type: 'search', placeholder: 'Search description or amount…' });
 
   const listHost = el('div', { class: 'tx-table' });
 
@@ -32,13 +33,25 @@ export async function renderTransactions() {
     if (fTo.value) filters.to = fTo.value;
     if (fCat.value) filters.category_id = fCat.value;
     if (fCur.value) filters.currency = fCur.value;
-    const rows = await db.listTransactions(filters);
+    let rows = await db.listTransactions(filters);
+    // Free-text search: case-insensitive description match, plus exact amount
+    // match when the query parses as a number ("when did I last pay 60?").
+    const q = fSearch.value.trim().toLowerCase();
+    if (q) {
+      const asNum = parseFloat(q);
+      rows = rows.filter((r) =>
+        (r.description || '').toLowerCase().includes(q) ||
+        (!isNaN(asNum) && (Math.abs(Number(r.amount)) === Math.abs(asNum) ||
+                           Math.abs(Number(r.amount_usd)) === Math.abs(asNum))));
+    }
     drawRows(rows);
   }
 
   [fFrom, fTo, fCat, fCur].forEach((c) => c.addEventListener('change', reload));
+  fSearch.addEventListener('input', reload);
 
   const filters = el('div', { class: 'card filters' }, [
+    el('div', { class: 'field filter-search' }, [el('label', {}, 'Search'), fSearch]),
     el('div', { class: 'field' }, [el('label', {}, 'From'), fFrom]),
     el('div', { class: 'field' }, [el('label', {}, 'To'), fTo]),
     el('div', { class: 'field' }, [el('label', {}, 'Category'), fCat]),
@@ -69,8 +82,8 @@ export async function renderTransactions() {
       el('div', { class: 'txr-cell', dataset: { label: 'Category' } }, cat?.name ?? '—'),
       el('div', { class: 'txr-cell', dataset: { label: 'Amount' } },
         `${Number(t.amount).toLocaleString()} ${t.currency}`),
-      el('div', { class: 'txr-cell txr-usd ' + (t.type === 'income' ? 'pos' : 'neg'), dataset: { label: 'USD' } },
-        (t.type === 'income' ? '+' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0))),
+      el('div', { class: 'txr-cell txr-usd ' + (t.type === 'income' ? 'pos' : t.type === 'transfer' ? '' : 'neg'), dataset: { label: CONFIG.BASE_CURRENCY } },
+        (t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0))),
       el('div', { class: 'txr-cell txr-actions' }, [
         el('button', { class: 'icon-btn', title: 'Edit', onClick: () => row.replaceWith(editView(t)) }, '✎'),
         el('button', { class: 'icon-btn', title: 'Delete', onClick: async () => {
@@ -95,6 +108,7 @@ export async function renderTransactions() {
     const type = el('select', {}, [
       el('option', { value: 'expense', selected: t.type === 'expense' ? 'selected' : null }, 'Expense'),
       el('option', { value: 'income', selected: t.type === 'income' ? 'selected' : null }, 'Income'),
+      t.type === 'transfer' ? el('option', { value: 'transfer', selected: 'selected' }, 'Transfer to fund') : null,
     ]);
     const desc = el('input', { type: 'text', value: t.description || '' });
 

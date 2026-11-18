@@ -46,3 +46,44 @@ create policy "transactions_update_own" on public.transactions
 drop policy if exists "transactions_delete_own" on public.transactions;
 create policy "transactions_delete_own" on public.transactions
   for delete using (auth.uid() = user_id);
+
+-- --- recurring ---------------------------------------------------------------
+alter table public.recurring enable row level security;
+
+drop policy if exists "recurring_select_own" on public.recurring;
+create policy "recurring_select_own" on public.recurring
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "recurring_insert_own" on public.recurring;
+create policy "recurring_insert_own" on public.recurring
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "recurring_update_own" on public.recurring;
+create policy "recurring_update_own" on public.recurring
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "recurring_delete_own" on public.recurring;
+create policy "recurring_delete_own" on public.recurring
+  for delete using (auth.uid() = user_id);
+
+-- --- settings, funds, debts, income_streams ------------------------------------
+-- Same rule everywhere: a user can only ever see and change their own rows.
+alter table public.settings       enable row level security;
+alter table public.funds          enable row level security;
+alter table public.debts          enable row level security;
+alter table public.income_streams enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['settings', 'funds', 'debts', 'income_streams'] loop
+    execute format('drop policy if exists "%1$s_select_own" on public.%1$s', t);
+    execute format('create policy "%1$s_select_own" on public.%1$s for select using (auth.uid() = user_id)', t);
+    execute format('drop policy if exists "%1$s_insert_own" on public.%1$s', t);
+    execute format('create policy "%1$s_insert_own" on public.%1$s for insert with check (auth.uid() = user_id)', t);
+    execute format('drop policy if exists "%1$s_update_own" on public.%1$s', t);
+    execute format('create policy "%1$s_update_own" on public.%1$s for update using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
+    execute format('drop policy if exists "%1$s_delete_own" on public.%1$s', t);
+    execute format('create policy "%1$s_delete_own" on public.%1$s for delete using (auth.uid() = user_id)', t);
+  end loop;
+end $$;

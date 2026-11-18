@@ -1,35 +1,97 @@
-# Personal Budget
+# Babylon's Purse
 
-A multi-currency personal finance tracker. It's a static site (vanilla
-HTML/CSS/JS, **no build step**) hosted on GitHub Pages, backed by
-[Supabase](https://supabase.com) for storage + auth, and installable as a
-standalone **PWA** on macOS (Dock) and iPhone (Home Screen) — syncing across
-devices.
+> *"A part of all you earn is yours to keep."* — the first rule from *The Richest Man in Babylon*, and what the money plan automates.
 
-- **Currencies:** USD, EUR, GBP, CRC (add more in `js/config.js`).
-- **Base/reference currency:** USD — all balances and budgets are in USD.
-- **Rate provider:** [ExchangeRate-API](https://www.exchangerate-api.com)
-  (required because CRC is outside the ECB/Frankfurter set).
-- **Timezone:** all month-boundary logic uses `America/Costa_Rica` (UTC-6),
-  locked globally so a transaction belongs to the same calendar month on every
-  device.
+A complete personal finance tracker that **adapts to whoever uses it**. A short
+setup asks a few plain questions — home currency, timezone, what you want to
+track, how you split your money — and the app builds itself around the
+answers. Everything stays editable in Settings.
+
+It's a static site (vanilla HTML/CSS/JS, **no build step**) hosted on GitHub
+Pages, backed by [Supabase](https://supabase.com) for accounts and sync, and
+installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
+
+- **Any home currency** — totals, budgets and reports use the currency each
+  user picks; transactions can be in any other currency and are converted at
+  the rate for their own date ([ExchangeRate-API](https://www.exchangerate-api.com),
+  with approximate built-in rates until a key is added).
+- **Their own calendar** — month boundaries follow the timezone chosen in setup
+  (defaults to the device's), so a transaction lands in the same month on
+  every device.
+- **Only what they use** — features are switched on per user; hidden features
+  keep their data.
+- Rebrand by changing `APP_NAME` in `js/config.js` (plus `manifest.webmanifest`).
 
 ---
 
 ## Features
 
-- **Dashboard** — total balance in USD, this month's spend vs. budget per
-  category (progress bars), total spend this month, and the 5 most recent
-  transactions.
+- **Setup wizard** — first launch asks for name, home currency (guessed from
+  the device region), other currencies, timezone, which features to enable,
+  and a money plan; then creates the user's funds, rules, first debt and first
+  income stream. Can be re-run from Settings.
+- **Money plan** — rules that split each month's net income
+  (income − fixed bills − debt payments − flexible spending) into funds:
+  *% of net income* (e.g. 10% giving), *fixed amounts* (e.g. a business
+  reserve), and *% of what's left* with a different % once a fund's goal is
+  reached (e.g. 25% to the emergency fund until it hits its goal). The Plan
+  page shows cash flow, where every dollar goes, and a month-by-month table.
+- **Funds** — emergency fund, giving, reserves, spending money: balances grow
+  from the plan and deposits, shrink when you spend from them. Each fund says
+  where the money is kept: in an account that pays interest (estimated from
+  APY, or the actual interest you enter) or as cash, which earns nothing.
+  Interest earned is tracked per fund and counts as taxable income.
+- **Debts** — loans, mortgages, cards: built on the minimum monthly payment
+  (entered, or worked out from the loan length), assumed paid every month on
+  its due day. Log what you actually paid and that month's figure replaces the
+  minimum, so extra payments move the payoff date. Shows % paid off, interest
+  paid, extra paid, payoff date, a warning when the minimum doesn't cover the
+  interest, and a "what if I paid extra?" slider.
+- **Passive income** — dividends, interest, side business, rental income,
+  royalties: received this month / last 12 months / average, and behind or
+  ahead of an expected amount.
+- **Taxes** — works for any country: one rate or your own brackets, a
+  tax-free allowance, and a tax year starting in any month. Income categories
+  say whether tax is already taken out, owed, or not taxable; expense
+  categories can be deductible. Shows estimated tax so far, paid, still to
+  pay, a full-year projection from your pace, how much to set aside monthly,
+  and quarter-by-quarter status. A "% of all income" plan rule can fill a Tax
+  reserve fund automatically. Estimates only — not tax advice.
+- **Home** — total balance, this month's spend vs. budget per category, plus
+  tiles for whichever features are on (saved in funds, left unassigned, debt
+  remaining, passive income), and the 5 most recent transactions.
 - **Transactions** — full list filterable by date range, category, and
   currency, with inline edit/delete.
 - **Add Transaction** — type, amount, currency, category, date, description.
-  Converts to USD at the **transaction's own date** and stores the original
-  amount, the USD equivalent, and the exact rate used.
-- **Categories & Budgets** — editable list with monthly USD budgets.
-- **Import** — CSV upload with column mapping, a validated preview (flags bad
-  dates / unknown currencies, maps unknown category names to **Other**, warns on
-  likely duplicates), then a bulk insert.
+  Converts to the home currency at the **transaction's own date** and stores
+  the original amount, the converted amount, and the exact rate used.
+  "More options" links it to a fund, a debt or an income stream.
+- **Categories & Budgets** — editable list with monthly budgets; each category
+  has a kind (fixed bill, flexible, debt payment, income) that drives the plan.
+- **Recurring transactions (auto-tracking)** — set rent, salary, or
+  subscriptions once (on the Add page) and the app records them automatically
+  every month on their day, catching up any months missed while the app was
+  closed. The dashboard shows what's still **upcoming this month** with a
+  projected month-end balance.
+- **Reports** — "Month in review" digest (spend vs last month, savings rate,
+  largest expense, biggest category movers), a 12-month income-vs-expense
+  chart, and top categories over the last year. All computed client-side,
+  rendered as dependency-free inline SVG.
+- **Budget rollover (envelopes)** — per-category toggle: unspent budget
+  carries into next month, overspending eats into it (YNAB/Actual-style).
+- **Smart fast entry** — description autocomplete from your history that
+  prefills the category and currency you used last time; remembers your
+  last-used currency.
+- **Search** — free-text description search plus exact-amount lookup on the
+  transactions page.
+- **Your data, always** — one-tap JSON backup and CSV export (re-importable);
+  local-mode restores from JSON backups.
+- **Import** — CSV upload with column mapping and a validated preview: flags
+  bad dates / unknown currencies, **auto-categorizes by description keywords**
+  (UBER → Transport, NETFLIX → Subscriptions…), maps unknown category names to
+  **Other**, detects income vs. expense from signed amounts, and warns on
+  likely duplicates (against saved data *and* within the file), then bulk
+  inserts.
 - **Local mode** — "Skip login" toggle that stores everything in this device's
   browser only (no account, no sync). A persistent banner makes local mode
   unmistakable.
@@ -46,19 +108,22 @@ devices.
 ├── css/
 │   └── styles.css            # Dark theme, mobile-first responsive layout
 ├── js/
-│   ├── config.js             # Supabase + API keys, currency list, timezone
+│   ├── config.js             # App name, Supabase + API keys, defaults
 │   ├── db.js                 # SINGLE data-access layer (Supabase OR localStorage)
-│   ├── rates.js              # Exchange-rate fetch + cache + USD conversion
+│   ├── store.js              # Per-user settings + one-call data loading
+│   ├── finance.js            # Pure calculation engine (plan, funds, debts, income)
+│   ├── rates.js              # Exchange rates → home currency, cached
+│   ├── recurring.js          # Auto-applies recurring transactions on launch
+│   ├── nav.js / icons.js     # Adaptive navigation + SVG icon set
 │   ├── router.js             # Tiny hash router
-│   ├── util.js               # Date/timezone, money formatting, DOM helpers
-│   ├── app.js                # Bootstrap, nav chrome, local-mode banner
+│   ├── util.js               # Dates, money formatting, DOM + sheet helpers
+│   ├── app.js                # Bootstrap: auth → setup wizard → app shell
 │   └── views/                # One module per page
-│       ├── auth.js
-│       ├── dashboard.js
-│       ├── transactions.js
-│       ├── add.js
-│       ├── categories.js
-│       └── import.js
+│       ├── setup.js  settings.js  auth.js
+│       ├── dashboard.js  transactions.js  add.js  reports.js
+│       ├── plan.js  funds.js  debts.js  income.js  taxes.js
+│       └── categories.js  import.js  more.js
+├── tests/finance.test.mjs    # Engine tests (18): node tests/finance.test.mjs
 ├── icons/                    # PWA icons (192, 512, 180 apple-touch)
 └── sql/
     ├── schema.sql            # Tables
@@ -77,7 +142,8 @@ exact same UI code.
 
 1. Sign up at [supabase.com](https://supabase.com) and create a new project.
 2. In **SQL Editor**, run [`sql/schema.sql`](sql/schema.sql), then
-   [`sql/rls.sql`](sql/rls.sql) (in that order).
+   [`sql/rls.sql`](sql/rls.sql) (in that order). Ran them before? Re-run
+   both after updating — they're idempotent and add any new tables/columns.
 3. In **Project Settings → API**, copy your **Project URL** and **anon public
    key**.
 

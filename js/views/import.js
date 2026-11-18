@@ -87,7 +87,16 @@ export async function renderImport() {
     }
     previewHost.replaceChildren(el('p', { class: 'muted' }, 'Validating & fetching rates…'));
 
+    // Bank exports commonly use signed amounts (negative = debit). If this file
+    // has BOTH signs, trust the sign for income/expense detection. If every
+    // amount is positive, fall back to the category name ("Income" → income).
+    const signedAmounts = parsed.rows.map((cells) =>
+      parseFloat(String(cells[idx.amount] || '').replace(/[^0-9.\-]/g, '')));
+    const hasMixedSigns =
+      signedAmounts.some((a) => a < 0) && signedAmounts.some((a) => a > 0);
+
     const prepared = [];
+    const seenInFile = new Set(); // duplicate detection within the file itself
     for (const cells of parsed.rows) {
       const dateRaw = (cells[idx.date] || '').trim();
       const amountRaw = (cells[idx.amount] || '').trim();
@@ -103,19 +112,29 @@ export async function renderImport() {
       if (!CONFIG.CURRENCIES.includes(currency)) flags.push('unknown currency');
       if (!(Math.abs(amount) > 0)) flags.push('invalid amount');
 
-      // Category: match by name, else fall back to "Other".
+      // Category resolution, in order of confidence:
+      //   1. exact name match on the file's category column
+      //   2. keyword auto-categorization from the description (UBER → Transport…)
+      //   3. fall back to "Other"
       const matched = byName.get(catNameRaw.toLowerCase());
-      const category = matched || other;
-      const categoryMapped = catNameRaw && !matched;
+      const guessedName = matched ? null : guessCategory(description || catNameRaw);
+      const guessed = guessedName ? byName.get(guessedName.toLowerCase()) : null;
+      const category = matched || guessed || other;
+      const categoryMapped = !!catNameRaw && !matched && !guessed;
+      const categoryGuessed = !!guessed;
 
-      // Income vs expense: negative amounts treated as expenses; positive as
-      // income only if the source category is literally "Income", else expense.
-      const type = matched?.name?.toLowerCase() === 'income' ? 'income' : (amount < 0 ? 'expense' : 'expense');
+      // Income vs expense.
+      const looksIncome =
+        (matched || guessed)?.name?.toLowerCase() === 'income';
+      const type = hasMixedSigns
+        ? (amount < 0 ? 'expense' : 'income')
+        : (looksIncome ? 'income' : 'expense');
 
       const rec = {
         ok: flags.length === 0,
         flags,
         categoryMapped,
+        categoryGuessed,
         catName: category?.name,
         type,
         date,
@@ -124,7 +143,9 @@ export async function renderImport() {
         description,
         category_id: category?.id,
       };
-      rec.duplicate = rec.ok && existingSig.has(sig({ date: rec.date, amount: rec.amount, currency: rec.currency, description: rec.description }));
+      const s = sig(rec);
+      rec.duplicate = rec.ok && (existingSig.has(s) || seenInFile.has(s));
+      if (rec.ok) seenInFile.add(s);
       prepared.push(rec);
     }
 
@@ -139,6 +160,7 @@ export async function renderImport() {
     for (const r of prepared) {
       const tags = [];
       if (!r.ok) r.flags.forEach((f) => tags.push(el('span', { class: 'tag tag-bad' }, f)));
+      if (r.categoryGuessed) tags.push(el('span', { class: 'tag tag-ok' }, `auto: ${r.catName}`));
       if (r.categoryMapped) tags.push(el('span', { class: 'tag tag-warn' }, '→ Other'));
       if (r.duplicate) tags.push(el('span', { class: 'tag tag-warn' }, 'possible duplicate'));
       table.append(el('div', { class: 'txr' + (r.ok ? '' : ' txr-bad') }, [
@@ -190,6 +212,30 @@ export async function renderImport() {
   }
 
   return root;
+}
+
+// Keyword → category auto-categorization for bank-export descriptions. First
+// matching keyword wins; returns a default-category name or null.
+const CATEGORY_KEYWORDS = [
+  ['Transport',      ['uber', 'lyft', 'didi', 'taxi', 'gas', 'gasolina', 'fuel', 'parking', 'metro', 'bus ', 'train']],
+  ['Food & Dining',  ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonald', 'grocer', 'supermercado', 'automercado', 'walmart', 'food', 'pizza', 'soda ', 'bakery']],
+  ['Subscriptions',  ['netflix', 'spotify', 'youtube', 'icloud', 'apple.com', 'hbo', 'disney', 'amazon prime', 'subscription', 'openai', 'chatgpt']],
+  ['Utilities',      ['electric', 'water', 'internet', 'phone', 'kolbi', 'claro', 'movistar', 'cable', 'utility', 'ice ']],
+  ['Housing/Rent',   ['rent', 'alquiler', 'mortgage', 'hoa', 'landlord']],
+  ['Health',         ['pharmacy', 'farmacia', 'doctor', 'clinic', 'hospital', 'dental', 'gym']],
+  ['Entertainment',  ['cinema', 'movie', 'concert', 'steam', 'playstation', 'nintendo', 'ticket']],
+  ['Travel',         ['airline', 'avianca', 'volaris', 'hotel', 'airbnb', 'booking.com', 'flight']],
+  ['Shopping',       ['amazon', 'ebay', 'aliexpress', 'store', 'tienda', 'mall']],
+  ['Income',         ['salary', 'payroll', 'salario', 'deposit from', 'paycheck', 'nomina']],
+];
+
+function guessCategory(text) {
+  const t = (text || '').toLowerCase();
+  if (!t) return null;
+  for (const [name, words] of CATEGORY_KEYWORDS) {
+    if (words.some((w) => t.includes(w))) return name;
+  }
+  return null;
 }
 
 // Duplicate signature: date+amount+currency+description.

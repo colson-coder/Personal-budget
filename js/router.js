@@ -20,6 +20,9 @@ export function setNotFound(render) {
 export function initRouter(outletEl, opts = {}) {
   outlet = outletEl;
   onNavigate = opts.onNavigate || null;
+  // Remove before adding so sign-out → boot() re-init never stacks duplicate
+  // listeners (removeEventListener is a no-op the first time).
+  window.removeEventListener('hashchange', renderCurrent);
   window.addEventListener('hashchange', renderCurrent);
   renderCurrent();
 }

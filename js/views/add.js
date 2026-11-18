@@ -4,13 +4,19 @@
 // =============================================================================
 
 import { db } from '../db.js';
+import { getSettings } from '../store.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
-import { navigate } from '../router.js';
 
 export async function renderAdd() {
-  const categories = await db.listCategories();
+  const safe = (t) => db.list(t).catch(() => []);
+  const [categories, history, funds, debts, streams] = await Promise.all([
+    db.listCategories(),
+    db.listTransactions({ limit: 500 }), // for autocomplete + smart suggestions
+    safe('funds'), safe('debts'), safe('income_streams'),
+  ]);
+  const mods = getSettings().modules;
 
   const root = el('div', { class: 'view view-add' });
   root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Add transaction')]));
@@ -18,17 +24,80 @@ export async function renderAdd() {
   const typeIncome = el('input', { type: 'radio', name: 'type', value: 'income', id: 'type-income' });
   const typeExpense = el('input', { type: 'radio', name: 'type', value: 'expense', id: 'type-expense', checked: 'checked' });
 
+  // Default the currency to whatever was used last (one less tap per entry).
+  const lastCurrency = localStorage.getItem('pb_last_currency') || CONFIG.BASE_CURRENCY;
   const amountInput = el('input', { type: 'number', step: '0.01', min: '0', id: 'f-amount', placeholder: '0.00', required: 'required', inputmode: 'decimal' });
   const currencySel = el('select', { id: 'f-currency' },
-    CONFIG.CURRENCIES.map((c) => el('option', { value: c, selected: c === CONFIG.BASE_CURRENCY ? 'selected' : null }, c)));
+    CONFIG.CURRENCIES.map((c) => el('option', { value: c, selected: c === lastCurrency ? 'selected' : null }, c)));
   const categorySel = el('select', { id: 'f-category', required: 'required' },
     categories.length
       ? categories.map((c) => el('option', { value: c.id }, c.name))
       : [el('option', { value: '' }, 'No categories — add some first')]);
   const dateInput = el('input', { type: 'date', id: 'f-date', value: todayISO(), max: todayISO(), required: 'required' });
-  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Groceries at Auto Mercado' });
+  const descInput = el('input', { type: 'text', id: 'f-desc', placeholder: 'e.g. Weekly groceries', list: 'desc-suggestions', autocomplete: 'off' });
+
+  // Smart entry (Cashew-style "title recognition" — a lookup, not ML):
+  // autocomplete past descriptions, and when one matches, prefill the
+  // category/currency you used for it last time.
+  const pastByDesc = new Map(); // lowercased description → most recent tx
+  for (const t of history) {
+    const k = (t.description || '').trim().toLowerCase();
+    if (k && !pastByDesc.has(k)) pastByDesc.set(k, t); // history is newest-first
+  }
+  const datalist = el('datalist', { id: 'desc-suggestions' },
+    [...pastByDesc.values()].slice(0, 50).map((t) => el('option', { value: t.description })));
+  descInput.addEventListener('input', () => {
+    const match = pastByDesc.get(descInput.value.trim().toLowerCase());
+    if (!match) return;
+    if (match.category_id && [...categorySel.options].some((o) => o.value === match.category_id)) {
+      categorySel.value = match.category_id;
+    }
+    if (CONFIG.CURRENCIES.includes(match.currency)) currencySel.value = match.currency;
+    if (match.type === 'income') typeIncome.checked = true;
+    else typeExpense.checked = true;
+    if (!amountInput.value) amountInput.placeholder = String(match.amount);
+  });
 
   const submitBtn = el('button', { class: 'btn btn-primary btn-block', type: 'submit' }, 'Save transaction');
+
+  // Optional links: pay from a fund, toward a debt, or from an income stream.
+  const opt = (rows, label) => [el('option', { value: '' }, label), ...rows.map((r) => el('option', { value: r.id }, r.name))];
+  const fundSel = el('select', { id: 'f-fund' }, opt(funds, 'No — regular spending'));
+  const debtSel = el('select', { id: 'f-debt' }, opt(debts, 'Not a debt payment'));
+  const streamSel = el('select', { id: 'f-stream' }, opt(streams, 'Not passive income'));
+  debtSel.addEventListener('change', () => {
+    const c = categories.find((x) => x.name === 'Debt Payment');
+    if (debtSel.value && c) categorySel.value = c.id;
+  });
+  streamSel.addEventListener('change', () => {
+    const c = categories.find((x) => x.name === 'Passive Income');
+    if (streamSel.value && c) categorySel.value = c.id;
+  });
+  function moreOptions() {
+    const parts = [];
+    if (mods.plan && funds.length) parts.push(el('div', { class: 'field opt-expense' }, [el('label', { for: 'f-fund' }, 'Paid from a fund?'), fundSel]));
+    if (mods.debts && debts.length) parts.push(el('div', { class: 'field opt-expense' }, [el('label', { for: 'f-debt' }, 'Toward a debt?'), debtSel]));
+    if (mods.income && streams.length) parts.push(el('div', { class: 'field opt-income' }, [el('label', { for: 'f-stream' }, 'From an income stream?'), streamSel]));
+    if (!parts.length) return null;
+    return el('details', { class: 'more-opts' }, [el('summary', {}, 'More options'), ...parts]);
+  }
+  function linkFields(type) {
+    const out = {};
+    if (type === 'expense') {
+      if (fundSel.value) out.fund_id = fundSel.value;
+      if (debtSel.value) out.debt_id = debtSel.value;
+    } else if (streamSel.value) out.stream_id = streamSel.value;
+    return out;
+  }
+  // Show only the options that fit the selected type.
+  const syncOpts = () => {
+    const inc = typeIncome.checked;
+    root.querySelectorAll('.opt-expense').forEach((n) => { n.style.display = inc ? 'none' : ''; });
+    root.querySelectorAll('.opt-income').forEach((n) => { n.style.display = inc ? '' : 'none'; });
+  };
+  typeIncome.addEventListener('change', syncOpts);
+  typeExpense.addEventListener('change', syncOpts);
+  requestAnimationFrame(syncOpts);
 
   const form = el('form', { class: 'card form-card' }, [
     el('div', { class: 'field' }, [
@@ -44,7 +113,8 @@ export async function renderAdd() {
     ]),
     el('div', { class: 'field' }, [el('label', { for: 'f-category' }, 'Category'), categorySel]),
     el('div', { class: 'field' }, [el('label', { for: 'f-date' }, 'Date'), dateInput]),
-    el('div', { class: 'field' }, [el('label', { for: 'f-desc' }, 'Description'), descInput]),
+    el('div', { class: 'field' }, [el('label', { for: 'f-desc' }, 'Description'), descInput, datalist]),
+    moreOptions(),
     submitBtn,
   ]);
 
@@ -69,9 +139,18 @@ export async function renderAdd() {
       await db.createTransaction({
         type, date, amount, currency, amount_usd, exchange_rate,
         category_id, description: descInput.value.trim(),
+        ...linkFields(type),
       });
-      toast('Transaction saved', 'success');
-      navigate('/dashboard');
+      localStorage.setItem('pb_last_currency', currency);
+      // Stay on the page for rapid entry: clear amount/description, keep
+      // category/currency/date, refocus amount.
+      toast('Saved — add another or head to the dashboard', 'success');
+      amountInput.value = '';
+      descInput.value = '';
+      fundSel.value = ''; debtSel.value = ''; streamSel.value = '';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save transaction';
+      amountInput.focus();
     } catch (err) {
       console.error(err);
       toast('Could not save: ' + (err.message || 'rate unavailable'), 'error');
@@ -81,5 +160,97 @@ export async function renderAdd() {
   });
 
   root.append(form);
+
+  // --- Recurring rules (auto-tracking) ---------------------------------------
+  // Rent, salary, subscriptions: set once, and the app records them on their
+  // day every month automatically (see js/recurring.js).
+  root.append(await recurringCard(categories));
+
   return root;
+}
+
+async function recurringCard(categories) {
+  const card = el('div', { class: 'card' });
+
+  async function reload() {
+    let rules = [];
+    try {
+      rules = await db.listRecurring();
+    } catch { /* table missing on old setups */ }
+
+    card.replaceChildren(
+      el('div', { class: 'card-head' }, [el('h2', {}, 'Recurring (automatic)')]),
+      el('p', { class: 'muted hint' },
+        'These are added automatically every month on their day — rent, salary, subscriptions.'),
+    );
+
+    const catById = new Map(categories.map((c) => [c.id, c]));
+    if (!rules.length) {
+      card.append(el('p', { class: 'muted' }, 'No recurring transactions yet.'));
+    }
+    for (const r of rules) {
+      card.append(el('div', { class: 'rec-row' }, [
+        el('div', { class: 'rec-main' }, [
+          el('span', { class: 'rec-desc' }, r.description || catById.get(r.category_id)?.name || 'Recurring'),
+          el('span', { class: 'rec-meta' },
+            `Day ${r.day_of_month} · ${catById.get(r.category_id)?.name ?? '—'} · ${r.type}`),
+        ]),
+        el('span', { class: 'rec-amt ' + (r.type === 'income' ? 'pos' : 'neg') },
+          `${Number(r.amount).toLocaleString()} ${r.currency}`),
+        el('button', { class: 'icon-btn', title: 'Delete rule', onClick: async () => {
+          if (!confirm('Stop this recurring transaction? Already-added months are kept.')) return;
+          await db.deleteRecurring(r.id);
+          toast('Recurring rule removed', 'info');
+          reload();
+        } }, '🗑'),
+      ]));
+    }
+
+    // Add-rule form
+    const rType = el('select', {}, [
+      el('option', { value: 'expense' }, 'Expense'),
+      el('option', { value: 'income' }, 'Income'),
+    ]);
+    const rAmount = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Amount', inputmode: 'decimal' });
+    const rCurrency = el('select', {}, CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c)));
+    const rCat = el('select', {}, categories.map((c) => el('option', { value: c.id }, c.name)));
+    const rDay = el('input', { type: 'number', min: '1', max: '31', value: '1', title: 'Day of month', inputmode: 'numeric' });
+    const rDesc = el('input', { type: 'text', placeholder: 'e.g. Rent, Salary, Netflix' });
+    const addBtn = el('button', { class: 'btn btn-primary btn-sm' }, 'Add recurring');
+
+    addBtn.addEventListener('click', async () => {
+      const amount = parseFloat(rAmount.value);
+      const day = parseInt(rDay.value, 10);
+      if (!(amount > 0)) return toast('Enter an amount greater than 0', 'error');
+      if (!(day >= 1 && day <= 31)) return toast('Day must be 1–31', 'error');
+      addBtn.disabled = true;
+      try {
+        await db.createRecurring({
+          type: rType.value, amount, currency: rCurrency.value,
+          category_id: rCat.value, day_of_month: day,
+          description: rDesc.value.trim(), last_applied: null, active: true,
+        });
+        toast('Recurring rule added — it starts this month', 'success');
+        reload();
+      } catch (err) {
+        toast('Could not add rule: ' + (err.message || 'unknown error'), 'error');
+        addBtn.disabled = false;
+      }
+    });
+
+    card.append(el('div', { class: 'rec-form' }, [
+      el('div', { class: 'rec-form-grid' }, [
+        el('div', { class: 'field' }, [el('label', {}, 'Type'), rType]),
+        el('div', { class: 'field' }, [el('label', {}, 'Amount'), rAmount]),
+        el('div', { class: 'field' }, [el('label', {}, 'Currency'), rCurrency]),
+        el('div', { class: 'field' }, [el('label', {}, 'Day of month'), rDay]),
+        el('div', { class: 'field' }, [el('label', {}, 'Category'), rCat]),
+        el('div', { class: 'field' }, [el('label', {}, 'Description'), rDesc]),
+      ]),
+      addBtn,
+    ]));
+  }
+
+  await reload();
+  return card;
 }

@@ -10,7 +10,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v1';
+const CACHE_VERSION = 'pb-shell-v5';
 
 const APP_SHELL = [
   './',
@@ -20,15 +20,29 @@ const APP_SHELL = [
   './js/app.js',
   './js/config.js',
   './js/db.js',
-  './js/router.js',
+  './js/finance.js',
+  './js/icons.js',
+  './js/nav.js',
   './js/rates.js',
+  './js/recurring.js',
+  './js/router.js',
+  './js/store.js',
   './js/util.js',
-  './js/views/auth.js',
-  './js/views/dashboard.js',
-  './js/views/transactions.js',
   './js/views/add.js',
+  './js/views/auth.js',
   './js/views/categories.js',
+  './js/views/dashboard.js',
+  './js/views/debts.js',
+  './js/views/funds.js',
   './js/views/import.js',
+  './js/views/income.js',
+  './js/views/more.js',
+  './js/views/plan.js',
+  './js/views/reports.js',
+  './js/views/settings.js',
+  './js/views/taxes.js',
+  './js/views/setup.js',
+  './js/views/transactions.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon-180.png',
