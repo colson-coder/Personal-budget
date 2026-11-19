@@ -18,7 +18,7 @@
   <link rel="icon" href="./icons/icon-192.png" />
 
   <!-- Paint the saved theme immediately (no flash). Default: Minimal Mono. -->
-  <script>try{document.documentElement.dataset.theme=localStorage.getItem('pb_theme')||'mono'}catch(e){document.documentElement.dataset.theme='mono'}</script>
+  <script>try{var t=localStorage.getItem('pb_theme')||'mono';if(t==='auto')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'mono';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='mono'}</script>
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
