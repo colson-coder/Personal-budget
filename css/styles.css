@@ -277,7 +277,8 @@ label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-
 .txr-usd { font-weight: 700; }
 
 /* --- Filters ------------------------------------------------------------------ */
-.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: end; }
+.filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.7rem; align-items: end; }
+.filters input, .filters select { min-width: 0; width: 100%; }
 .filters .btn { grid-column: span 2; }
 
 /* --- Forms -------------------------------------------------------------------- */
