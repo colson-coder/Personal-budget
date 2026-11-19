@@ -196,22 +196,24 @@ const HINTS = {
   out: ['debit', 'withdrawal', 'money out', 'paid out', 'out', 'cargo', 'débito', 'debe', 'soll', 'débit'],
   in: ['credit', 'deposit', 'money in', 'paid in', 'in', 'abono', 'crédito', 'haber', 'haben', 'crédit'],
   currency: ['currency', 'ccy', 'moneda', 'währung', 'devise', 'moeda', 'valuta'],
-  description: ['description', 'desc', 'payee', 'merchant', 'name', 'details', 'detail', 'narrative', 'memo', 'concepto', 'verwendungszweck', 'buchungstext', 'empfänger', 'beschreibung', 'libellé', 'libelle', 'descrição', 'omschrijving', 'descrizione', 'reference', 'transaction'],
+  description: ['description', 'desc', 'payee', 'merchant', 'name', 'details', 'detail', 'narrative', 'memo', 'concepto', 'verwendungszweck', 'buchungstext', 'empfänger', 'beschreibung', 'libellé', 'libelle', 'descrição', 'omschrijving', 'descrizione', 'reference', 'text', 'transaction'],
   category: ['category', 'categ', 'categoría', 'kategorie', 'catégorie', 'categoria'],
 };
 
 export function guessColumns(headers) {
   const used = new Set();
-  const find = (key, { exact = false } = {}) => {
-    const hs = headers.map((h) => h.toLowerCase().trim());
+  const hs = headers.map((h) => h.toLowerCase().trim());
+  const find = (key, { exact = false, skip = null } = {}) => {
     for (const hint of HINTS[key]) {
-      const i = hs.findIndex((h, idx) => !used.has(idx) && (exact ? h === hint : h === hint || h.includes(hint)));
+      const i = hs.findIndex((h, idx) => !used.has(idx) && !(skip && skip.test(h)) && (exact ? h === hint : h === hint || h.includes(hint)));
       if (i >= 0) { used.add(i); return i; }
     }
     return -1;
   };
   const date = find('date');
-  const amount = find('amount');
+  // A single amount column, but never "Debit Amount" / "Credit Amount" (that
+  // layout has separate in/out columns), a balance, or a date like "Value Date".
+  const amount = find('amount', { skip: /debit|credit|withdraw|deposit|paid (in|out)|money (in|out)|balance|saldo|date|datum|fecha|soll|haben/ });
   // Only look for in/out columns when there's no single amount column.
   const out = amount < 0 ? find('out') : -1;
   const inn = amount < 0 ? find('in', { exact: true }) : -1;
