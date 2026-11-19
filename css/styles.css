@@ -380,10 +380,11 @@ input[type="file"] { padding: 0.6rem; }
 .auth-hint { font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 0.6rem; }
 
 /* --- Toasts ----------------------------------------------------------------------- */
-#toast-host { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 0.5rem; width: calc(100% - 2rem); max-width: 420px; }
+/* Top of the screen, so messages never cover a sheet's buttons or the tab bar. */
+#toast-host { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 0.5rem; width: calc(100% - 2rem); max-width: 420px; }
 .toast {
   padding: 0.7rem 1rem; border-radius: var(--radius-sm); font-size: 0.9rem;
-  opacity: 0; transform: translateY(10px); transition: opacity 0.2s, transform 0.2s;
+  opacity: 0; transform: translateY(-10px); transition: opacity 0.2s, transform 0.2s;
   background: var(--bg-elev-2); border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-card);
 }
@@ -442,7 +443,6 @@ input[type="file"] { padding: 0.6rem; }
   .nav-side.active { background: var(--accent-glow); color: var(--accent); }
   .outlet { padding: 1.6rem 1.8rem 2.5rem; max-width: none; }
   .bottomnav { display: none; }
-  #toast-host { bottom: 24px; }
   /* Keep the sticky sidebar clear of the local-mode banner. */
   .layout.has-banner .sidenav { top: 37px; height: calc(100vh - 37px); }
 }
@@ -535,8 +535,8 @@ input[type="file"] { padding: 0.6rem; }
 
 /* --- Plan ---------------------------------------------------------------------------- */
 .flow-row { display: flex; justify-content: space-between; padding: 0.45rem 0; font-variant-numeric: tabular-nums; }
-.flow-total { display: flex; justify-content: space-between; align-items: center; padding-top: 0.75rem; margin-top: 0.4rem; border-top: 1px solid var(--border-strong); font-weight: 700; }
-.flow-total-value { font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.flow-total { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-top: 0.75rem; margin-top: 0.4rem; border-top: 1px solid var(--border-strong); font-weight: 700; }
+.flow-total-value { flex: none; white-space: nowrap; font-size: 1.45rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .stack { margin-top: 1rem; }
 .stack-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--bg-elev-2); gap: 2px; }
 .stack-bar span { height: 100%; }
@@ -943,3 +943,34 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
 .chat-starters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chat-form { display: flex; gap: 0.5rem; align-items: flex-end; }
 .chat-input { flex: 1; resize: none; min-height: 2.75rem; font: inherit; }
+.plan-group .row-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.plan-group-first { border-top: 0; padding-top: 0; margin-top: 0.6rem; }
+
+/* Activity — compact list on phones; folded filters. Desktop keeps the table. */
+.filter-search-row { display: flex; gap: 0.5rem; }
+.filter-search-row input { flex: 1; min-width: 0; }
+.txr-meta { display: none; }
+@media (max-width: 767px) {
+  .filters .filter-more { display: none; }
+  .filters.open .field.filter-more { display: block; }
+  .filters.open .btn.filter-more { display: inline-flex; }
+  .filters:not(.open) { gap: 0; }
+  .filters:not(.open) .filter-search { margin-bottom: 0; }
+  .tx-table { gap: 0; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 0.9rem; }
+  .tx-table > p { margin: 0; padding: 1rem 0; }
+  .txr:not(.txr-edit) {
+    background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none;
+    padding: 0.7rem 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "desc usd" "meta actions";
+    gap: 0.15rem 0.75rem; align-items: center;
+  }
+  .txr:not(.txr-edit):last-child { border-bottom: 0; }
+  .txr:not(.txr-edit) .txr-cell::before { display: none; }
+  .txr:not(.txr-edit) .txr-date, .txr:not(.txr-edit) .txr-cat, .txr:not(.txr-edit) .txr-amt { display: none; }
+  .txr:not(.txr-edit) .txr-desc { grid-area: desc; display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .txr:not(.txr-edit) .txr-usd { grid-area: usd; justify-content: flex-end; }
+  .txr:not(.txr-edit) .txr-meta { grid-area: meta; display: block; color: var(--text-dim); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .txr:not(.txr-edit) .txr-actions { grid-area: actions; gap: 0.25rem; }
+  .txr:not(.txr-edit) .txr-actions .icon-btn { width: 30px; height: 30px; min-height: 30px; font-size: 0.8rem; }
+  .txr-edit { margin: 0; background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; padding: 0.8rem 0; }
+}
+@media (min-width: 768px) { .filter-toggle { display: none; } }

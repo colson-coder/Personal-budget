@@ -11,7 +11,7 @@ import { db } from '../db.js';
 import { CONFIG } from '../config.js';
 import { loadAll } from '../store.js';
 import { debtLedger, streamLedger, taxSummary } from '../finance.js';
-import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth } from '../util.js';
+import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth, shortDate } from '../util.js';
 import { navigate } from '../router.js';
 import { buildInsights } from '../insights.js';
 import { aiCoachAvailable, openCoachChat } from './coachchat.js';
@@ -119,7 +119,7 @@ function coachCard(data) {
           open ? 'Show less' : `All ${all.length} tips`) : null,
       ]),
       ...list.map(item),
-      aiCoachAvailable() ? el('button', { class: 'btn btn-sm coach-ask', onClick: () => openCoachChat(data) }, 'Ask the coach') : null,
+      ...(aiCoachAvailable() ? [el('button', { class: 'btn btn-sm coach-ask', onClick: () => openCoachChat(data) }, 'Ask the coach')] : []),
     );
   }
   draw();
@@ -272,7 +272,7 @@ function recentTile(txs, catById) {
     const tone = t.type === 'income' ? 'pos' : '';
     const label = t.description || catById.get(t.category_id)?.name || (t.type === 'transfer' ? 'Assigned to fund' : 'Transaction');
     return el('div', { class: 'tile-row' }, [
-      el('span', { class: 'tile-row-label' }, [label, el('span', { class: 'muted small block' }, `${catById.get(t.category_id)?.name ?? (t.type === 'transfer' ? 'Transfer' : '')} · ${t.date.slice(5)}`)]),
+      el('span', { class: 'tile-row-label' }, [label, el('span', { class: 'muted small block' }, `${catById.get(t.category_id)?.name ?? (t.type === 'transfer' ? 'Transfer' : '')} · ${shortDate(t.date)}`)]),
       el('span', { class: 'tile-row-value ' + tone }, [
         sign + fmtUSD(Math.abs(Number(t.amount_usd) || 0)),
         t.currency !== CONFIG.BASE_CURRENCY ? el('span', { class: 'muted small block' }, `${Number(t.amount).toLocaleString()} ${t.currency}`) : null,

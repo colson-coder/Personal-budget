@@ -91,7 +91,7 @@ function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
     if (Math.abs(d) >= 1) moves.push({ id, d });
   }
   moves.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
-  if (moves.length) {
+  if (moves.length && (prev.expense > 0 || prev.byCat.size > 0)) { // nothing to compare in a first month
     const list = el('div', { class: 'movers' });
     for (const m of moves.slice(0, 3)) {
       list.append(el('div', { class: 'mover-row' }, [

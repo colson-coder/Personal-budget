@@ -64,8 +64,7 @@ export function renderAuth(onAuthed) {
         class: 'btn btn-ghost btn-block',
         type: 'button',
         onClick: () => {
-          setLocalMode(true);
-          toast('Local mode enabled — data stays on this device.', 'info');
+          setLocalMode(true); // the local-mode banner explains it from here on
           onAuthed();
         },
       }, 'Skip login (local mode)'),

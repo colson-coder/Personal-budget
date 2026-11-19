@@ -221,3 +221,12 @@ export function progress(pct, { over = false } = {}) {
     el('div', { class: 'progress-bar' + (over ? ' over' : ''), style: `width:${Math.max(0, Math.min(1, pct)) * 100}%` }),
   ]);
 }
+
+// "Nov 19" (this year) or "Nov 19, 2025".
+export function shortDate(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return iso;
+  const sameYear = iso.slice(0, 4) === new Date().toISOString().slice(0, 4);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+}
+

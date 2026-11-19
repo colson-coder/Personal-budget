@@ -7,14 +7,14 @@
 import { db } from '../db.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
-import { el, fmtUSD, toast, isValidISODate } from '../util.js';
+import { el, fmtUSD, toast, isValidISODate, shortDate } from '../util.js';
 
 export async function renderTransactions() {
   const categories = await db.listCategories();
   const catById = new Map(categories.map((c) => [c.id, c]));
 
   const root = el('div', { class: 'view view-transactions' });
-  root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Transactions')]));
+  root.append(el('div', { class: 'view-head' }, [el('h1', {}, 'Activity')]));
 
   // --- Filters ---------------------------------------------------------------
   const fFrom = el('input', { type: 'date' });
@@ -50,14 +50,22 @@ export async function renderTransactions() {
   [fFrom, fTo, fCat, fCur].forEach((c) => c.addEventListener('change', reload));
   fSearch.addEventListener('input', reload);
 
+  // On phones only search shows; the rest folds behind "Filters".
+  const activeCount = () => [fFrom, fTo, fCat, fCur].filter((c) => c.value).length;
+  const toggle = el('button', { class: 'btn filter-toggle', type: 'button', onClick: () => {
+    filters.classList.toggle('open');
+  } }, 'Filters');
+  const syncToggle = () => { const n = activeCount(); toggle.textContent = n ? `Filters (${n})` : 'Filters'; };
+  [fFrom, fTo, fCat, fCur].forEach((c) => c.addEventListener('change', syncToggle));
   const filters = el('div', { class: 'card filters' }, [
-    el('div', { class: 'field filter-search' }, [el('label', {}, 'Search'), fSearch]),
-    el('div', { class: 'field' }, [el('label', {}, 'From'), fFrom]),
-    el('div', { class: 'field' }, [el('label', {}, 'To'), fTo]),
-    el('div', { class: 'field' }, [el('label', {}, 'Category'), fCat]),
-    el('div', { class: 'field' }, [el('label', {}, 'Currency'), fCur]),
-    el('button', { class: 'btn btn-ghost', onClick: () => {
-      fFrom.value = ''; fTo.value = ''; fCat.value = ''; fCur.value = ''; reload();
+    el('div', { class: 'field filter-search' }, [el('label', {}, 'Search'),
+      el('div', { class: 'filter-search-row' }, [fSearch, toggle])]),
+    el('div', { class: 'field filter-more' }, [el('label', {}, 'From'), fFrom]),
+    el('div', { class: 'field filter-more' }, [el('label', {}, 'To'), fTo]),
+    el('div', { class: 'field filter-more' }, [el('label', {}, 'Category'), fCat]),
+    el('div', { class: 'field filter-more' }, [el('label', {}, 'Currency'), fCur]),
+    el('button', { class: 'btn btn-ghost filter-more', onClick: () => {
+      fFrom.value = ''; fTo.value = ''; fCat.value = ''; fCur.value = ''; syncToggle(); reload();
     } }, 'Clear'),
   ]);
   root.append(filters);
@@ -79,9 +87,13 @@ export async function renderTransactions() {
       el('div', { class: 'txr-cell txr-date', dataset: { label: 'Date' } }, t.date),
       el('div', { class: 'txr-cell txr-desc', dataset: { label: 'Description' } },
         t.description || '—'),
-      el('div', { class: 'txr-cell', dataset: { label: 'Category' } }, cat?.name ?? '—'),
-      el('div', { class: 'txr-cell', dataset: { label: 'Amount' } },
+      el('div', { class: 'txr-cell txr-cat', dataset: { label: 'Category' } }, cat?.name ?? '—'),
+      el('div', { class: 'txr-cell txr-amt', dataset: { label: 'Amount' } },
         `${Number(t.amount).toLocaleString()} ${t.currency}`),
+      // Phone layout: one quiet line under the description.
+      el('div', { class: 'txr-meta' }, [cat?.name ?? 'Uncategorized', shortDate(t.date),
+        t.currency !== CONFIG.BASE_CURRENCY ? `${Number(t.amount).toLocaleString()} ${t.currency}` : null]
+        .filter(Boolean).join(' · ')),
       el('div', { class: 'txr-cell txr-usd ' + (t.type === 'income' ? 'pos' : t.type === 'transfer' ? '' : 'neg'), dataset: { label: CONFIG.BASE_CURRENCY } },
         (t.type === 'income' ? '+' : t.type === 'transfer' ? '→ ' : '−') + fmtUSD(Math.abs(Number(t.amount_usd) || 0))),
       el('div', { class: 'txr-cell txr-actions' }, [

@@ -38,10 +38,14 @@ export async function renderFunds() {
     el('button', { class: 'btn btn-primary btn-sm', onClick: () => fundSheet(null) }, '＋ New fund'),
   ]));
 
+  // Interest boxes only once some fund can earn interest.
+  const earns = sim.interestToDate > 0 || sim.funds.some((f) => f.interestMode === 'manual' || (f.interestMode === 'auto' && Number(f.fund.apy) > 0));
   root.append(el('div', { class: 'grid cards-3' }, [
     tile('Total in funds', fmtUSD(sim.total)),
-    tile('Interest earned so far', fmtUSD(sim.interestToDate), 'pos'),
-    tile('Interest this month (est.)', fmtUSD(sim.funds.reduce((a, f) => a + f.interestThisMonth, 0)), 'pos'),
+    ...(earns ? [
+      tile('Interest earned so far', fmtUSD(sim.interestToDate), 'pos'),
+      tile('Interest this month (est.)', fmtUSD(sim.funds.reduce((a, f) => a + f.interestThisMonth, 0)), 'pos'),
+    ] : []),
   ]));
 
   if (!sim.funds.length) {
@@ -101,7 +105,7 @@ function fundCard(f, data) {
   if (tm && (tm.alloc + tm.added > 0 || tm.spent > 0)) {
     card.append(el('div', { class: 'fund-month' }, [
       chip('+' + fmtUSD(tm.alloc + tm.added), 'from plan & deposits this month', 'pos'),
-      chip('−' + fmtUSD(tm.spent), `${spentLabel} this month`, tm.spent ? 'neg' : 'muted'),
+      chip((tm.spent ? '−' : '') + fmtUSD(tm.spent), `${spentLabel} this month`, tm.spent ? 'neg' : 'muted'),
     ]));
   }
 
