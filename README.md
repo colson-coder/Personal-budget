@@ -61,6 +61,19 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
   set aside, with quick actions: add income (e.g. a side hustle), add an
   expense, and assign money into any fund. Below, one simple tile per area —
   budgets, funds, debts, taxes, passive income, coming up, recent activity.
+- **Coach** — tips worked out from the user's own numbers, on the device and
+  free. It gives one "next step" at a time, in the order classic money books
+  agree on: spend less than you earn, keep a tenth (*The Richest Man in
+  Babylon*), save a starter cushion, pay off expensive debt, save a full
+  cushion, then put money to work. It also raises alerts for overspending,
+  budgets, spikes, taxes and debts that never shrink. An optional AI chat
+  ("Ask the coach") is built but switched off until its server function is
+  deployed; see [docs/ai-coach.md](docs/ai-coach.md).
+- **Automatic card logging** — phone automations (an iOS Shortcuts Wallet
+  trigger, Android MacroDroid/Tasker) open a quick-add link
+  (`#/add?amount=&merchant=&auto=1`) on every tap-to-pay purchase. The
+  currency comes from the amount's symbol and the category is learned per
+  shop. See [docs/auto-logging.md](docs/auto-logging.md).
 - **Transactions** — full list filterable by date range, category, and
   currency, with inline edit/delete.
 - **Add Transaction** — type, amount, currency, category, date, description.
@@ -87,12 +100,11 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
   transactions page.
 - **Your data, always** — one-tap JSON backup and CSV export (re-importable);
   local-mode restores from JSON backups.
-- **Import** — CSV upload with column mapping and a validated preview: flags
-  bad dates / unknown currencies, **auto-categorizes by description keywords**
-  (UBER → Transport, NETFLIX → Subscriptions…), maps unknown category names to
-  **Other**, detects income vs. expense from signed amounts, and warns on
-  likely duplicates (against saved data *and* within the file), then bulk
-  inserts.
+- **Import** — bank files in CSV/TSV/OFX/QFX, in any column layout and
+  number format (`1,234.56`, `1.234,56`, separate debit/credit columns,
+  headers in several languages). Column mappings are remembered per bank.
+  Categories come from learned shop rules, then keywords. Likely duplicates
+  start unticked.
 - **Local mode** — "Skip login" toggle that stores everything in this device's
   browser only (no account, no sync). A persistent banner makes local mode
   unmistakable.
@@ -104,6 +116,7 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 ```
 .
 ├── index.html                # App shell (loads everything as ES modules)
+├── welcome.html              # Marketing landing page (linked from sign-in)
 ├── manifest.webmanifest      # PWA manifest (name, icons, standalone display)
 ├── service-worker.js         # App-shell cache (bump CACHE_VERSION on deploy)
 ├── css/
@@ -124,7 +137,8 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 │       ├── dashboard.js  transactions.js  add.js  reports.js
 │       ├── plan.js  funds.js  debts.js  income.js  taxes.js
 │       └── categories.js  import.js  more.js
-├── tests/finance.test.mjs    # Engine tests (18): node tests/finance.test.mjs
+├── tests/                    # node tests/<name>.test.mjs — finance (19), importer (8), insights (13)
+├── supabase/functions/coach/ # Optional AI coach Edge Function (off by default)
 ├── icons/                    # PWA icons (192, 512, 180 apple-touch)
 └── sql/
     ├── schema.sql            # Tables
