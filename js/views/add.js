@@ -129,7 +129,10 @@ export async function renderAdd(params = {}) {
   if (fromLink) {
     const amt = Math.abs(parseAmount(String(params.amount || '')));
     if (amt > 0) amountInput.value = String(Math.round(amt * 100) / 100);
-    const cur = String(params.currency || '').toUpperCase().trim();
+    const SYMBOLS = { '€': 'EUR', '£': 'GBP', '₡': 'CRC', '¥': 'JPY', '₹': 'INR', '₩': 'KRW', '₱': 'PHP', '₦': 'NGN', 'R$': 'BRL', 'C$': 'CAD', 'A$': 'AUD', 'MX$': 'MXN', 'US$': 'USD' };
+    const sym = Object.keys(SYMBOLS).sort((a, b) => b.length - a.length).find((k) => String(params.amount || '').includes(k));
+    const code = String(params.amount || '').toUpperCase().match(/\b[A-Z]{3}\b/)?.[0];
+    const cur = String(params.currency || code || (sym && SYMBOLS[sym]) || '').toUpperCase().trim();
     if (CONFIG.CURRENCIES.includes(cur)) currencySel.value = cur;
     if (params.type === 'income') typeIncome.checked = true;
     if (isValidISODate(params.date || '') && params.date <= todayISO()) dateInput.value = params.date;

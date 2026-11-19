@@ -111,6 +111,13 @@ export function parseAmount(raw) {
     const after = s.length - lastComma - 1;
     if (after === 3 && lastDot === -1 && s.indexOf(',') === lastComma && s.length > 4) s = s.replace(/,/g, '');
     else s = s.replace(/\./g, '').replace(',', '.');
+  } else if (lastComma === -1 && lastDot !== -1) {
+    // Dots only. "1.234.567" or "2.500" (3 digits after a single dot, as in
+    // ₡2.500 or 1.234 €) are thousands; "4.50" / "0.125" are decimals.
+    const parts = s.split('.');
+    const thousands = parts.length > 2 ? parts.slice(1).every((p) => p.length === 3)
+      : parts[1].length === 3 && /^[1-9]\d{0,2}$/.test(parts[0]);
+    if (thousands) s = parts.join('');
   } else {
     s = s.replace(/,/g, '');
   }
