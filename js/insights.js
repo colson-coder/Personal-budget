@@ -373,9 +373,13 @@ export function detectRepeats(txs, { rules = [], todayYM, dismissed = [] } = {})
   for (const [g, list] of groups) {
     const key = g.split('|')[1];
     if (ruleKeys.has(key) || dismissed.includes(key)) continue;
-    const byMonth = new Map();
-    for (const t of list) if (!byMonth.has(ymOf(t))) byMonth.set(ymOf(t), t); // one per month
-    if (byMonth.size < 3 || byMonth.size !== list.length) continue; // several a month = not a bill
+    // One per month (the largest). A stray second charge in a month is fine;
+    // three or more a month (weekly groceries) isn't a bill.
+    const perMonth = new Map();
+    for (const t of list) perMonth.set(ymOf(t), [...(perMonth.get(ymOf(t)) || []), t]);
+    if ([...perMonth.values()].some((xs) => xs.length > 2)) continue;
+    const byMonth = new Map([...perMonth].map(([m, xs]) => [m, xs.reduce((a, b) => (Number(b.amount) > Number(a.amount) ? b : a))]));
+    if (byMonth.size < 3) continue;
     const months = [...byMonth.keys()].sort();
     const last = months[months.length - 1];
     if (last < addMonths(todayYM, -1)) continue;

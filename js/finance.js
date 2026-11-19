@@ -508,7 +508,9 @@ export function goalPace(f, targetYM, todayYM) {
   // Months left, counting the current month: Nov → Dec is 2 months of saving.
   const monthsLeft = monthRange(todayYM, targetYM).length;
   if (targetYM < todayYM) return { status: 'overdue', left: r2(left), perMonth: r2(left), monthsLeft: 0, pace: 0, projectedYM: null };
-  const done = (f.history || []).filter((h) => h.ym < todayYM).slice(-3);
+  // Only months the fund existed for: a fund made this month has no pace yet.
+  const born = String(f.fund?.created_at || '').slice(0, 7);
+  const done = (f.history || []).filter((h) => h.ym < todayYM && (!born || h.ym >= born)).slice(-3);
   const pace = done.length ? done.reduce((a, h) => a + (h.end - h.start), 0) / done.length : 0;
   const perMonth = left / monthsLeft;
   const projectedYM = pace > 0 ? addMonths(todayYM, Math.ceil(left / pace) - 1) : null;

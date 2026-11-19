@@ -281,6 +281,9 @@ test('goal dates: per month, on track, behind, reached, overdue', () => {
   assert.equal(goalPace(f(640, [100]), '2026-09', '2026-11').status, 'overdue');
   assert.equal(goalPace({ goal: 1800, balance: 0, history: [{ ym: '2026-11', start: 0, end: 0 }] }, '2027-06', '2026-11').status, 'new');
   assert.equal(goalPace({ goal: 0, balance: 0, history: [] }, '2027-06', '2026-11'), null);
+  // A fund created this month has no pace yet, even if the plan is older.
+  const born = { ...f(100, [0, 0, 0]), fund: { created_at: '2026-11-10T00:00:00Z' } };
+  assert.equal(goalPace(born, '2027-06', '2026-11').status, 'new');
 });
 
 console.log(`\n${passed} tests passed`);
