@@ -32,6 +32,10 @@ export const CONFIG = {
   // supabase/functions/coach (see docs/ai-coach.md). Signed-in users only.
   AI_COACH: false,
 
+  // iCloud link to a ready-made "Log to Babylon's Purse" shortcut. When set,
+  // Settings → Log card purchases offers a one-tap "Get the shortcut" button.
+  SHORTCUT_URL: '',
+
   // Currencies the app can log. Add more here later — nothing else hard-codes
   // this list. USD is the base/reference currency for all stored balances.
   // Replaced at boot by the currencies chosen in setup (Settings → Currencies).

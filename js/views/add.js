@@ -156,7 +156,12 @@ export async function renderAdd(params = {}) {
     const SYMBOLS = { '€': 'EUR', '£': 'GBP', '₡': 'CRC', '¥': 'JPY', '₹': 'INR', '₩': 'KRW', '₱': 'PHP', '₦': 'NGN', 'R$': 'BRL', 'C$': 'CAD', 'A$': 'AUD', 'MX$': 'MXN', 'US$': 'USD' };
     const sym = Object.keys(SYMBOLS).sort((a, b) => b.length - a.length).find((k) => String(params.amount || '').includes(k));
     const code = String(params.amount || '').toUpperCase().match(/\b[A-Z]{3}\b/)?.[0];
-    const cur = String(params.currency || code || (sym && SYMBOLS[sym]) || '').toUpperCase().trim();
+    // A bare "$" means your home currency when that's a dollar/peso, else USD.
+    // No symbol at all: your home currency (a card purchase is usually local).
+    const DOLLARISH = ['USD', 'CAD', 'AUD', 'NZD', 'MXN', 'COP', 'CLP', 'ARS', 'SGD', 'HKD'];
+    const bareDollar = !sym && /\$/.test(String(params.amount || ''))
+      ? (DOLLARISH.includes(CONFIG.BASE_CURRENCY) ? CONFIG.BASE_CURRENCY : 'USD') : null;
+    const cur = String(params.currency || code || (sym && SYMBOLS[sym]) || bareDollar || CONFIG.BASE_CURRENCY).toUpperCase().trim();
     if (CONFIG.CURRENCIES.includes(cur)) currencySel.value = cur;
     if (params.type === 'income') typeIncome.checked = true;
     if (isValidISODate(params.date || '') && params.date <= todayISO()) dateInput.value = params.date;

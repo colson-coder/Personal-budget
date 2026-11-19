@@ -974,3 +974,9 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
   .txr-edit { margin: 0; background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; padding: 0.8rem 0; }
 }
 @media (min-width: 768px) { .filter-toggle { display: none; } }
+.autolog-steps b { color: var(--text); font-weight: 600; }
+.autolog-steps code, .autolog-check code { font-size: 0.85em; background: var(--bg-elev-2); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.autolog-check { margin-top: 0.75rem; }
+.autolog-more { margin-top: 0.9rem; }
+.autolog-more summary { cursor: pointer; color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.6rem; }
+.autolog-card > .btn-primary { margin: 0.25rem 0 0.5rem; }
