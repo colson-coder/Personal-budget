@@ -106,6 +106,8 @@ export function el(tag, attrs = {}, children = []) {
       node.setAttribute(k, v);
     }
   }
+  // Icon-only buttons (✎, 🗑, ✕, ‹ ›) get their title as a spoken label.
+  if (tag === 'button' && attrs.title && !attrs['aria-label']) node.setAttribute('aria-label', attrs.title);
   const kids = Array.isArray(children) ? children : [children];
   for (const c of kids) {
     if (c === null || c === undefined || c === false) continue;

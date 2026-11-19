@@ -177,8 +177,10 @@ export async function renderAdd(params = {}) {
       if (pick) categorySel.value = pick;
       else if (byName.get('other') && !typeIncome.checked) categorySel.value = byName.get('other').id;
     }
-    root.querySelector('.view-head')?.append(
-      el('p', { class: 'muted hint' }, 'Filled in from a quick-add link — check it and tap Save.'));
+    if (params.auto !== '1') {
+      root.querySelector('.view-head')?.after(
+        el('p', { class: 'muted hint quick-hint' }, 'Filled in from your phone. Check it and tap Save.'));
+    }
   }
 
   form.addEventListener('submit', async (e) => {
@@ -199,11 +201,14 @@ export async function renderAdd(params = {}) {
       // Convert using the rate for THIS transaction's date. Throws on failure,
       // which blocks the save rather than storing a bad conversion.
       const { amount_usd, exchange_rate } = await convertToUSD(amount, currency, date);
-      await db.createTransaction({
+      const saved = await db.createTransaction({
         type, date, amount, currency, amount_usd, exchange_rate,
         category_id, description: descInput.value.trim(),
         ...linkFields(type),
       });
+      // Saved from a quick-add link without a tap: show what happened, with Undo
+      // (also guards against someone else's link adding an entry).
+      if (fromLink && params.auto === '1' && saved?.id) showUndo(saved, categorySel.selectedOptions[0]?.textContent);
       localStorage.setItem('pb_last_currency', currency);
       // Learn the shop → category pairing (shared with bank import), so the
       // next purchase there is categorised the same way.
@@ -213,7 +218,7 @@ export async function renderAdd(params = {}) {
       }
       // Stay on the page for rapid entry: clear amount/description, keep
       // category/currency/date, refocus amount.
-      toast('Saved — add another or head to the dashboard', 'success');
+      if (!(fromLink && params.auto === '1')) toast('Saved — add another or head to the dashboard', 'success');
       amountInput.value = '';
       descInput.value = '';
       fundSel.value = ''; debtSel.value = ''; streamSel.value = '';
@@ -229,6 +234,24 @@ export async function renderAdd(params = {}) {
   });
 
   root.append(form);
+
+  function showUndo(t, catName) {
+    const bar = el('div', { class: 'card undo-bar', role: 'status' }, [
+      el('div', {}, [
+        el('div', { class: 'undo-title' }, `Logged ${t.description || 'purchase'}`),
+        el('div', { class: 'muted small' }, `${Number(t.amount).toLocaleString()} ${t.currency} · ${catName || ''}`),
+      ]),
+      el('div', { class: 'undo-actions' }, [
+        el('a', { class: 'btn btn-sm', href: '#/transactions' }, 'Change'),
+        el('button', { class: 'btn btn-sm btn-ghost', onClick: async () => {
+          await db.deleteTransaction(t.id);
+          bar.replaceChildren(el('div', { class: 'muted small' }, 'Removed. Nothing was saved.'));
+        } }, 'Undo'),
+      ]),
+    ]);
+    root.querySelector('.undo-bar')?.remove();
+    form.before(bar);
+  }
 
   if (fromLink && params.auto === '1' && Number(amountInput.value) > 0 && categorySel.value) {
     // Wait until the form is on the page (a detached form can't submit).
