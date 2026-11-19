@@ -277,7 +277,8 @@ label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-
 .txr-usd { font-weight: 700; }
 
 /* --- Filters ------------------------------------------------------------------ */
-.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: end; }
+.filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.7rem; align-items: end; }
+.filters input, .filters select { min-width: 0; width: 100%; }
 .filters .btn { grid-column: span 2; }
 
 /* --- Forms -------------------------------------------------------------------- */
@@ -872,3 +873,73 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
   .hero-actions .btn { font-size: 0.88rem; padding: 0 0.4rem; }
   .wide-only { display: none; }
 }
+
+/* --- Import --------------------------------------------------------------------- */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  padding: 1.6rem 1rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+  cursor: pointer; text-align: center; color: var(--text); font-weight: 600; margin: 0.4rem 0 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.file-drop:hover { border-color: var(--accent); background: var(--accent-glow); }
+.file-drop input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.imp-list { display: flex; flex-direction: column; margin: 0.6rem 0 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); max-height: 60vh; overflow-y: auto; }
+.imp-row {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "box main amt" "box cat cat";
+  gap: 0.35rem 0.75rem; align-items: center; padding: 0.7rem 0.8rem; margin: 0;
+  border-top: 1px solid var(--border); color: var(--text); cursor: pointer; font-weight: 400;
+}
+.imp-row:first-child { border-top: 0; }
+.imp-row > input { grid-area: box; width: auto; min-height: auto; accent-color: var(--accent); }
+.imp-row.dup { opacity: 0.7; }
+.imp-row.bad { opacity: 0.55; }
+.imp-main { grid-area: main; display: flex; flex-direction: column; min-width: 0; }
+.imp-desc { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imp-meta { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
+.imp-cat-wrap { grid-area: cat; display: flex; gap: 0.4rem; align-items: center; }
+.imp-cat { min-height: 36px; padding-top: 0.3rem; padding-bottom: 0.3rem; font-size: 0.88rem; max-width: 220px; }
+.imp-amt { grid-area: amt; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag-dim { background: var(--bg-elev-2); color: var(--text-dim); }
+@media (min-width: 768px) {
+  .imp-row { grid-template-columns: auto 1fr 260px 120px; grid-template-areas: "box main cat amt"; }
+  .imp-amt { text-align: right; }
+}
+.hero-actions .btn { gap: 0; }
+
+/* Coach (Home) — plain-rule tips from js/insights.js */
+.coach-card { margin-bottom: 1rem; }
+.coach-toggle { background: none; border: 0; cursor: pointer; padding: 0; font: inherit; font-size: 0.9rem; font-weight: 600; }
+.coach-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.coach-item:first-of-type { border-top: 0; padding-top: 0.25rem; }
+.coach-item:hover { color: var(--text); }
+.coach-item:hover .coach-title { text-decoration: underline; text-underline-offset: 3px; }
+.coach-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 0.45rem; background: var(--text-dim); }
+.tone-warn .coach-dot { background: var(--neg); }
+.tone-good .coach-dot { background: var(--pos); }
+.coach-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.coach-title { font-weight: 600; font-size: 0.95rem; }
+.coach-body { color: var(--text-dim); font-size: 0.875rem; line-height: 1.45; }
+.coach-step { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.coach-why { font-size: 0.75rem; color: var(--text-dim); font-style: italic; margin-top: 0.15rem; opacity: 0.85; }
+
+/* Settings → Log card purchases automatically */
+.autolog-seg { display: flex; gap: 0.5rem; margin: 0.25rem 0 0.75rem; }
+.autolog-steps { margin: 0 0 1rem; padding-left: 1.25rem; color: var(--text-dim); font-size: 0.9rem; line-height: 1.5; }
+.autolog-steps li { margin: 0.3rem 0; }
+.autolog-url { display: flex; gap: 0.5rem; align-items: center; background: var(--input-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.5rem 0.5rem 0.75rem; }
+.autolog-url code { flex: 1; min-width: 0; font-size: 0.8rem; overflow-wrap: anywhere; color: var(--text); }
+.autolog-note { color: var(--text-dim); border-left: 2px solid var(--border-strong); padding-left: 0.6rem; }
+.coach-ask { margin-top: 0.75rem; }
+
+/* AI coach chat sheet */
+.chat { display: flex; flex-direction: column; gap: 0.75rem; }
+.chat-log { display: flex; flex-direction: column; gap: 0.5rem; max-height: 50vh; overflow-y: auto; }
+.chat-log:empty { display: none; }
+.chat-msg { padding: 0.6rem 0.8rem; border-radius: var(--radius); font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; max-width: 92%; }
+.chat-user { align-self: flex-end; background: var(--bg-elev-2); border: 1px solid var(--border); }
+.chat-assistant { align-self: flex-start; background: var(--input-bg); border: 1px solid var(--border); }
+.chat-wait { color: var(--text-dim); }
+.chat-error { align-self: flex-start; color: var(--neg); font-size: 0.88rem; }
+.chat-starters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chat-form { display: flex; gap: 0.5rem; align-items: flex-end; }
+.chat-input { flex: 1; resize: none; min-height: 2.75rem; font: inherit; }

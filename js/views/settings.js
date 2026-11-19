@@ -8,6 +8,7 @@ import { getSettings, saveSettings, loadAll } from '../store.js';
 import { sortRules } from '../finance.js';
 import { fundSheet } from './funds.js';
 import { dataCard } from './categories.js';
+import { autoLogCard } from './autolog.js';
 import { THEMES } from '../theme.js';
 import { el, toast, field, fmtUSD } from '../util.js';
 import { navigate } from '../router.js';
@@ -33,6 +34,9 @@ export async function renderSettings(params = {}) {
     root.append(plan);
     if (params.section === 'plan') requestAnimationFrame(() => plan.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
+  const auto = autoLogCard();
+  root.append(auto);
+  if (params.section === 'autolog') requestAnimationFrame(() => auto.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   root.append(dataCard());
   root.append(el('div', { class: 'card' }, [
     el('h2', {}, 'Start over'),

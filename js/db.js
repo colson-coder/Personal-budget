@@ -44,6 +44,14 @@ async function sb() {
   return _sb;
 }
 
+// The signed-in user's access token (for calling our own Edge Functions, e.g.
+// the AI coach). null in local mode or when signed out.
+export async function accessToken() {
+  if (isLocalMode()) return null;
+  const { data } = await (await sb()).auth.getSession();
+  return data?.session?.access_token || null;
+}
+
 function uid() {
   return (
     crypto.randomUUID?.() ||

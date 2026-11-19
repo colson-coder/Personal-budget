@@ -17,6 +17,19 @@ plan rules). Three buttons:
 - **＋ Expense** — opens the full Add form.
 - **Assign money** — move any amount into a fund you choose (quick 25% / 50%
   / All buttons).
+Under the big number is the **Coach**: tips worked out from your own numbers.
+It shows one **next step** at a time, in the order the classic money books
+agree on:
+1. Spend less than you earn.
+2. Keep a tenth of what you earn.
+3. Save one month of bills.
+4. Pay off expensive debt, highest rate first.
+5. Save 3 months of bills.
+6. Put your money to work.
+
+It also flags anything urgent, like going over budget or tax that hasn't been
+set aside. Tap a tip to go to the page that fixes it.
+
 Below, one tile per area — Budgets, Funds, Debts, Taxes, Passive income,
 Coming up, Recent activity — each opens its full page. Use ‹ › for past months.
 
@@ -83,13 +96,20 @@ month, and quarter-by-quarter status. *Estimates only — not tax advice.*
 expense, biggest changes), a 12-month income vs spending chart, and your top
 categories.
 
-**Import** — Upload a CSV from your bank. Match its columns, preview, then
-import. It guesses categories from descriptions (UBER → Transport), spots
-duplicates, and flags rows it can't read.
+**Import** — Upload the CSV or OFX/QFX file your bank gives you, in almost any
+layout or language. It remembers how you matched each bank's columns. It
+guesses categories (UBER → Transport) and learns from your changes. Possible
+duplicates start unticked.
+
+**Log card purchases automatically** (Settings) — set up once on your phone, so
+every tap-to-pay purchase is logged on its own. On iPhone, use a Shortcuts
+"Transaction" automation. On Android, use MacroDroid or Tasker. The phone opens
+a quick-add link with the amount and shop, and the app works out the currency
+and category. See [auto-logging.md](auto-logging.md).
 
 **Settings** — Appearance (4 themes), your name, home currency, timezone,
-currencies, which features to show, your money plan, backup/export, and
-"Run setup again".
+currencies, which features to show, your money plan, automatic purchase
+logging, backup/export, and "Run setup again".
 
 ## Accounts & your data
 - **With an account**, your data syncs across your phone and computer.

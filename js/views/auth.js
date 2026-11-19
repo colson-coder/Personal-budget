@@ -71,6 +71,7 @@ export function renderAuth(onAuthed) {
       }, 'Skip login (local mode)'),
       el('p', { class: 'auth-hint' },
         'Local mode stores everything only on this device and will not sync.'),
+      el('p', { class: 'auth-hint' }, [el('a', { href: './welcome.html' }, `What is ${CONFIG.APP_NAME}?`)]),
     ]);
 
     form.addEventListener('submit', async (e) => {

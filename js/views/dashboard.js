@@ -13,6 +13,8 @@ import { loadAll } from '../store.js';
 import { debtLedger, streamLedger, taxSummary } from '../finance.js';
 import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth } from '../util.js';
 import { navigate } from '../router.js';
+import { buildInsights } from '../insights.js';
+import { aiCoachAvailable, openCoachChat } from './coachchat.js';
 import { incomeSheet, assignSheet } from './quick.js';
 import { fundSheet } from './funds.js';
 
@@ -67,6 +69,7 @@ export async function renderDashboard(params = {}) {
     ]) : null,
   ]);
   root.append(hero);
+  if (isCurrent) { const c = coachCard(data); if (c) root.append(c); }
 
   // After adding income the board reloads; reopen Assign with fresh numbers.
   async function openAssignAfter(amount) {
@@ -89,6 +92,38 @@ export async function renderDashboard(params = {}) {
   grid.append(recentTile(txs, catById));
   root.append(grid);
   return root;
+}
+
+// --- Coach: plain-rule tips from the user's own numbers (js/insights.js) ----------
+function coachCard(data) {
+  const all = buildInsights(data, { fmt: fmtUSD, today: todayISO() });
+  if (!all.length) return null;
+  const SHOW = 2;
+  const card = el('div', { class: 'card coach-card' });
+  const item = (x) => el('a', { class: 'coach-item tone-' + x.tone, href: x.href }, [
+    el('span', { class: 'coach-dot' }),
+    el('span', { class: 'coach-text' }, [
+      x.step ? el('span', { class: 'coach-step' }, `Step ${x.step.n} of ${x.step.of}`) : null,
+      el('span', { class: 'coach-title' }, x.title),
+      el('span', { class: 'coach-body' }, x.body),
+      x.why ? el('span', { class: 'coach-why' }, x.why) : null,
+    ]),
+  ]);
+  let open = false;
+  function draw() {
+    const list = open ? all : all.slice(0, SHOW);
+    card.replaceChildren(
+      el('div', { class: 'card-head' }, [
+        el('h2', {}, 'Coach'),
+        all.length > SHOW ? el('button', { class: 'link coach-toggle', onClick: () => { open = !open; draw(); } },
+          open ? 'Show less' : `All ${all.length} tips`) : null,
+      ]),
+      ...list.map(item),
+      aiCoachAvailable() ? el('button', { class: 'btn btn-sm coach-ask', onClick: () => openCoachChat(data) }, 'Ask the coach') : null,
+    );
+  }
+  draw();
+  return card;
 }
 
 function heroStat(label, value, tone) {
