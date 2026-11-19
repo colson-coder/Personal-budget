@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { db } from '../db.js';
-import { getSettings } from '../store.js';
+import { getSettings, saveSettings } from '../store.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
@@ -175,6 +175,12 @@ export async function renderAdd(params = {}) {
         ...linkFields(type),
       });
       localStorage.setItem('pb_last_currency', currency);
+      // Learn the shop → category pairing (shared with bank import), so the
+      // next purchase there is categorised the same way.
+      const mk = merchantKey(descInput.value);
+      if (mk && type === 'expense' && getSettings().import_rules?.[mk] !== category_id) {
+        saveSettings({ import_rules: { ...(getSettings().import_rules || {}), [mk]: category_id } }).catch(() => {});
+      }
       // Stay on the page for rapid entry: clear amount/description, keep
       // category/currency/date, refocus amount.
       toast('Saved — add another or head to the dashboard', 'success');
