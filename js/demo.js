@@ -117,7 +117,7 @@ export function demoData(today) {
   });
   // A trip abroad last month, and a quarterly tax payment.
   tx(months[2], 26, 'expense', 60, 'Food', 'Dinner in Madrid', { currency: 'EUR', usd: 64.8 });
-  tx(months[2], 15, 'expense', 300, 'Taxes', 'Quarterly tax payment');
+  tx(months[1], 15, 'expense', 300, 'Taxes', 'Quarterly tax payment');
 
   transactions.sort((a, b) => b.date.localeCompare(a.date));
 
