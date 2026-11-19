@@ -123,6 +123,7 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 .
 ├── index.html                # App shell (loads everything as ES modules)
 ├── welcome.html              # Marketing landing page (linked from sign-in)
+├── privacy.html              # Plain-language privacy page
 ├── manifest.webmanifest      # PWA manifest (name, icons, standalone display)
 ├── service-worker.js         # App-shell cache (bump CACHE_VERSION on deploy)
 ├── css/

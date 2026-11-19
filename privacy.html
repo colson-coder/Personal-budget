@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Privacy · Babylon's Purse</title>
+  <meta name="description" content="What Babylon's Purse stores, why, and how to delete it." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <style>
+    :root { --bg: #000; --line: #1f1f1f; --text: #ededed; --dim: #8f8f8f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    a { color: var(--text); }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 32px; }
+    .top a { text-decoration: none; font-weight: 700; }
+    h1 { font-size: 2rem; letter-spacing: -.02em; margin: 0 0 4px; }
+    h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+    p, li { color: var(--dim); }
+    strong { color: var(--text); font-weight: 600; }
+    .updated { color: var(--dim); font-size: .9rem; margin: 0 0 24px; }
+    .box { border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; }
+    footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 16px; font-size: .85rem; color: var(--dim); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a href="./welcome.html">Babylon's Purse</a>
+      <a href="./index.html">Open the app →</a>
+    </div>
+
+    <h1>Privacy</h1>
+    <p class="updated">Last updated: November 2026</p>
+
+    <div class="box">
+      <p><strong>The short version.</strong> Your financial data is yours. It isn't sold, rented or used for ads. Without an account, everything stays in your browser on your device and never reaches us. With an account, your data is stored so that only you can read it.</p>
+    </div>
+
+    <h2>What is stored</h2>
+    <p><strong>Device-only mode (no account):</strong> everything you enter (transactions, categories, budgets, funds, debts, settings) is saved in your browser's local storage on that device. It isn't sent anywhere. Clearing your browser data deletes it.</p>
+    <p><strong>With an account:</strong> your email address and the data you enter, stored with our database provider, Supabase. Database rules let each account read and change only its own data.</p>
+    <p><strong>Demo:</strong> the demo uses made-up sample data stored in your browser. Anything you already had on that device is put back when you leave the demo.</p>
+
+    <h2>What is sent to other services</h2>
+    <ul>
+      <li><strong>Exchange rates:</strong> to convert currencies, the app asks a rates service for the rate on a date. Only the currencies and the date are sent, never your amounts.</li>
+      <li><strong>Purchase auto-logging (optional):</strong> if you set up the phone shortcut, your phone sends the amount and shop name of each tap-to-pay purchase to the app, which saves it like any entry you type. No bank login is involved.</li>
+      <li><strong>AI coach (not switched on yet):</strong> if it's offered in the future, your question and a summary of your totals (never individual purchases) would be sent to an AI provider to write the answer. This page will be updated before that happens.</li>
+    </ul>
+
+    <h2>What doesn't happen</h2>
+    <ul>
+      <li>No ads, no selling or sharing your data, no tracking across other websites.</li>
+      <li>The app never asks for your bank password.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li><strong>Export:</strong> Settings → Your data → download a full backup or a CSV, anytime.</li>
+      <li><strong>Delete:</strong> Settings → Your data → <em>Delete all my data</em> removes everything you entered. To have your account's sign-in removed too, ask using the link below.</li>
+    </ul>
+
+    <h2>Not financial advice</h2>
+    <p>The coach, tax estimates and other figures are general guidance based on your own numbers. They aren't financial, tax or legal advice. Check with a qualified professional before making big decisions.</p>
+
+    <h2>Questions or requests</h2>
+    <p>Open a request on the project's public page: <a href="https://github.com/colson-coder/Personal-budget/issues/new?title=Privacy%20question">ask a privacy question</a>. Don't include personal or financial details in it. If you need to share something private, say so and you'll be given a private way to send it.</p>
+
+    <footer>Babylon's Purse · <a href="./welcome.html">Home</a> · <a href="./index.html">Open the app</a></footer>
+  </div>
+</body>
+</html>

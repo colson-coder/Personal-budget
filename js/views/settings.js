@@ -39,6 +39,15 @@ export async function renderSettings(params = {}) {
   if (params.section === 'autolog') requestAnimationFrame(() => auto.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   root.append(dataCard());
   root.append(el('div', { class: 'card' }, [
+    el('h2', {}, 'Help us improve'),
+    el('p', { class: 'muted small hint' }, 'Found something confusing or broken, or have an idea? Tell us. Please don’t include personal or financial details, because the feedback page is public.'),
+    el('div', { class: 'data-actions' }, [
+      el('a', { class: 'btn btn-sm', target: '_blank', rel: 'noopener',
+        href: `${CONFIG.FEEDBACK_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent('What happened, or what would you like?\n\n\nWhich page?\n\nPhone or computer?\n')}` }, 'Send feedback'),
+      el('a', { class: 'btn btn-sm btn-ghost', href: './privacy.html' }, 'Privacy'),
+    ]),
+  ]));
+  root.append(el('div', { class: 'card' }, [
     el('h2', {}, 'Start over'),
     el('p', { class: 'muted small hint' }, 'Run the setup questions again. Your existing data is kept.'),
     el('button', { class: 'btn btn-sm', onClick: async () => {
