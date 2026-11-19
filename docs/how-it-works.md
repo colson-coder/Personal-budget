@@ -73,6 +73,10 @@ them anytime. Each fund says where the money is kept:
 - *Account that pays interest — estimate it* (enter the APY)
 - *Account that pays interest — I'll enter what I get*
 - *Cash / checking* — earns nothing
+
+Give a fund a **goal** and a **"reach it by" month**, and the card tells you how
+much to save each month, and whether you're on track or behind at your recent
+pace.
 Spending from a fund doesn't count against your monthly plan, because that
 money was already set aside.
 
@@ -111,8 +115,17 @@ and category. See [auto-logging.md](auto-logging.md).
 currencies, which features to show, your money plan, automatic purchase
 logging, backup/export, and "Run setup again".
 
+## Trying it out
+
+**Try a demo with sample data** (on the sign-in screen, or *Try the demo* on
+the landing page) opens the app with a made-up person's last few months. Look
+around, then tap **Start my own** in the banner. If you already had device-only
+data, it's put back exactly as it was.
+
 ## Accounts & your data
 - **With an account**, your data syncs across your phone and computer.
   Each person can only ever see their own data.
 - **Local mode** (no account) keeps everything on that one device only.
 - **Backup** anytime in Settings → Your data (JSON backup or CSV export).
+- **Delete all my data** in the same place. Type DELETE to confirm. Your sign-in
+  stays so you can start over.
