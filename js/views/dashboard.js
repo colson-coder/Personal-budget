@@ -9,7 +9,8 @@
 
 import { db } from '../db.js';
 import { CONFIG } from '../config.js';
-import { loadAll } from '../store.js';
+import { loadAll, saveSettings } from '../store.js';
+import { isDemo } from '../demo.js';
 import { debtLedger, streamLedger, taxSummary } from '../finance.js';
 import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth, shortDate } from '../util.js';
 import { navigate } from '../router.js';
@@ -69,6 +70,7 @@ export async function renderDashboard(params = {}) {
     ]) : null,
   ]);
   root.append(hero);
+  if (isCurrent) { const g = startCard(data); if (g) root.append(g); }
   if (isCurrent) { const c = coachCard(data); if (c) root.append(c); }
 
   // After adding income the board reloads; reopen Assign with fresh numbers.
@@ -92,6 +94,54 @@ export async function renderDashboard(params = {}) {
   grid.append(recentTile(txs, catById));
   root.append(grid);
   return root;
+}
+
+// --- Getting started: a checklist for new users that ticks itself off ------------
+const isPhone = () => /iphone|ipad|android/i.test(navigator.userAgent);
+const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+function startCard(data) {
+  const { settings, txs, categories } = data;
+  if (isDemo() || settings.checklist_hidden) return null;
+  const steps = [
+    { done: txs.some((t) => t.type === 'income'), label: 'Add this month’s income', href: null, action: 'income' },
+    { done: txs.some((t) => t.type === 'expense'), label: 'Log an expense', href: '#/add' },
+    { done: categories.some((c) => Number(c.monthly_budget_usd) > 0), label: 'Set a budget for one category', href: '#/categories' },
+    ...(isPhone() ? [
+      { done: installed() || settings.installed_seen, label: 'Add the app to your Home Screen', href: null, action: 'install' },
+      { done: !!settings.autolog_seen, label: 'Log card purchases automatically', href: '#/settings?section=autolog' },
+    ] : []),
+  ];
+  const left = steps.filter((x) => !x.done).length;
+  if (!left) return null;
+
+  const card = el('div', { class: 'card start-card' });
+  const help = el('div', { class: 'start-help muted small' });
+  const hide = async () => { await saveSettings({ checklist_hidden: true }); card.remove(); };
+  const installHelp = () => {
+    help.textContent = /iphone|ipad/i.test(navigator.userAgent)
+      ? 'In Safari, tap Share (the square with an arrow), then “Add to Home Screen”, then Add.'
+      : 'In Chrome, tap ⋮ (top right), then “Install app” or “Add to Home screen”.';
+    saveSettings({ installed_seen: true }).catch(() => {});
+  };
+  card.append(
+    el('div', { class: 'card-head' }, [
+      el('h2', {}, 'Getting started'),
+      el('button', { class: 'link coach-toggle', onClick: hide }, 'Hide'),
+    ]),
+    el('div', { class: 'muted small' }, `${steps.length - left} of ${steps.length} done`),
+    el('ul', { class: 'start-list' }, steps.map((x) => el('li', { class: x.done ? 'done' : '' }, [
+      el('span', { class: 'start-check', 'aria-hidden': 'true' }, x.done ? '✓' : ''),
+      x.done ? el('span', {}, x.label)
+        : x.href ? el('a', { href: x.href }, x.label)
+        : el('button', { class: 'link-inline start-btn', onClick: () => {
+            if (x.action === 'install') installHelp();
+            else document.querySelector('.hero-actions .btn-primary')?.click();
+          } }, x.label),
+    ]))),
+    help,
+  );
+  return card;
 }
 
 // --- Coach: plain-rule tips from the user's own numbers (js/insights.js) ----------
