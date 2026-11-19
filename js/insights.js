@@ -272,3 +272,47 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
 
   return out.sort((a, b) => b.score - a.score).slice(0, max);
 }
+
+// --- Snapshot for the AI coach -------------------------------------------------------
+// A compact summary of the user's money: totals and names they chose, never
+// individual transaction descriptions. Sent with each AI coach question.
+export function financeSnapshot(data, { today = null } = {}) {
+  const { settings = {}, catById = new Map(), categories = [], txs = [], debts = [], streams = [], sim, todayYM } = data;
+  const m = settings.modules || {};
+  const day = today ? Number(today.slice(8, 10)) : 15;
+  const active = new Set(txs.map(ymOf));
+  const past = [1, 2, 3].map((i) => addMonths(todayYM, -i)).filter((ym) => active.has(ym));
+  const typical = (k) => past.length ? r2(past.map((ym) => monthSummary(ym, txs, catById)[k]).reduce((a, b) => a + b, 0) / past.length) : null;
+  const now = monthSummary(todayYM, txs, catById);
+  const spentBy = new Map();
+  for (const t of txs) if (t.type === 'expense' && ymOf(t) === todayYM) spentBy.set(t.category_id, (spentBy.get(t.category_id) || 0) + usd(t));
+
+  const snap = {
+    home_currency: settings.base_currency || 'USD',
+    today: today || todayYM,
+    features_on: Object.keys(m).filter((k) => m[k]),
+    months_of_history: active.size,
+    typical_month: past.length ? { income: typical('income'), fixed_bills: typical('hard'), debt_payments: typical('debt'), flexible_spending: typical('soft'), tax_paid: typical('tax') } : null,
+    this_month_so_far: { income: now.income, fixed_bills: now.hard, debt_payments: now.debt, flexible_spending: now.soft, tax_paid: now.tax },
+    budgets_this_month: categories.filter((c) => Number(c.monthly_budget_usd) > 0)
+      .map((c) => ({ category: c.name, budget: r2(c.monthly_budget_usd), spent: r2(spentBy.get(c.id) || 0) })),
+  };
+  if (m.plan && sim) {
+    const plan = sim.planFor(todayYM);
+    snap.left_to_assign_this_month = r2(plan.leftToAssign);
+    snap.funds = sim.funds.map((f) => ({ name: f.fund.name, type: f.fund.kind, balance: f.balance, goal: f.goal || null, interest_apy: Number(f.fund.apy) || 0 }));
+    const fname = new Map(sim.funds.map((f) => [f.fund.id, f.fund.name]));
+    snap.money_plan_rules = (settings.plan?.rules || []).map((r) => ({ fund: fname.get(r.fund_id) || '?', method: r.method, value: r.value, ...(r.value_after_goal != null ? { value_after_goal: r.value_after_goal } : {}) }));
+  }
+  if (m.debts) snap.debts = debts.map((d) => {
+    const l = debtLedger(d, txs, todayYM, day);
+    return { name: d.name, balance: l.balance, apr: Number(d.apr) || 0, minimum_payment: l.minimum, payoff: l.payoffYM || 'never at the minimum' };
+  });
+  if (m.income) snap.passive_income_streams = streams.map((s) => ({ name: s.name, type: s.kind, expected_monthly: Number(s.expected_monthly) || null }));
+  if (m.taxes) {
+    const t = taxSummary({ tax: settings.tax, txs, catById, interestByMonth: sim?.interestByMonth, todayYM });
+    snap.taxes = { estimated_so_far: t.estimated, paid: t.paid, still_to_pay: t.remaining, projected_year: t.projectedYear, suggested_monthly_set_aside: t.suggestedMonthly };
+  }
+  snap.app_tips_showing = buildInsights(data, { today }).map((x) => x.title);
+  return snap;
+}

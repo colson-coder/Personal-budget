@@ -28,6 +28,10 @@ export const CONFIG = {
   // https://www.exchangerate-api.com (free tier: 1,500 requests/month).
   EXCHANGE_RATE_API_KEY: 'YOUR-EXCHANGERATE-API-KEY',
 
+  // AI coach chat ("Ask the coach" on Home). Turn on only after deploying
+  // supabase/functions/coach (see docs/ai-coach.md). Signed-in users only.
+  AI_COACH: false,
+
   // Currencies the app can log. Add more here later — nothing else hard-codes
   // this list. USD is the base/reference currency for all stored balances.
   // Replaced at boot by the currencies chosen in setup (Settings → Currencies).

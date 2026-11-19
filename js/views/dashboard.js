@@ -14,6 +14,7 @@ import { debtLedger, streamLedger, taxSummary } from '../finance.js';
 import { el, fmtUSD, todayISO, monthLabel, nextMonthYM, prevMonthYM, progress, shortMonth } from '../util.js';
 import { navigate } from '../router.js';
 import { buildInsights } from '../insights.js';
+import { aiCoachAvailable, openCoachChat } from './coachchat.js';
 import { incomeSheet, assignSheet } from './quick.js';
 import { fundSheet } from './funds.js';
 
@@ -118,6 +119,7 @@ function coachCard(data) {
           open ? 'Show less' : `All ${all.length} tips`) : null,
       ]),
       ...list.map(item),
+      aiCoachAvailable() ? el('button', { class: 'btn btn-sm coach-ask', onClick: () => openCoachChat(data) }, 'Ask the coach') : null,
     );
   }
   draw();

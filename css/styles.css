@@ -928,3 +928,17 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
 .autolog-url { display: flex; gap: 0.5rem; align-items: center; background: var(--input-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.5rem 0.5rem 0.75rem; }
 .autolog-url code { flex: 1; min-width: 0; font-size: 0.8rem; overflow-wrap: anywhere; color: var(--text); }
 .autolog-note { color: var(--text-dim); border-left: 2px solid var(--border-strong); padding-left: 0.6rem; }
+.coach-ask { margin-top: 0.75rem; }
+
+/* AI coach chat sheet */
+.chat { display: flex; flex-direction: column; gap: 0.75rem; }
+.chat-log { display: flex; flex-direction: column; gap: 0.5rem; max-height: 50vh; overflow-y: auto; }
+.chat-log:empty { display: none; }
+.chat-msg { padding: 0.6rem 0.8rem; border-radius: var(--radius); font-size: 0.92rem; line-height: 1.5; white-space: pre-wrap; max-width: 92%; }
+.chat-user { align-self: flex-end; background: var(--bg-elev-2); border: 1px solid var(--border); }
+.chat-assistant { align-self: flex-start; background: var(--input-bg); border: 1px solid var(--border); }
+.chat-wait { color: var(--text-dim); }
+.chat-error { align-self: flex-start; color: var(--neg); font-size: 0.88rem; }
+.chat-starters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chat-form { display: flex; gap: 0.5rem; align-items: flex-end; }
+.chat-input { flex: 1; resize: none; min-height: 2.75rem; font: inherit; }
