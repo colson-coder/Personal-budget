@@ -91,4 +91,13 @@ test('merchant keys ignore numbers and card noise', () => {
   assert.equal(layoutKey(['Date', ' Amount ']), 'date|amount');
 });
 
+test('column guessing: separate Debit/Credit Amount columns and Value Date', () => {
+  const uk = guessColumns(['Transaction Date', 'Transaction Type', 'Sort Code', 'Account Number', 'Transaction Description', 'Debit Amount', 'Credit Amount', 'Balance']);
+  assert.equal(uk.amount, -1); assert.equal(uk.out, 5); assert.equal(uk.in, 6); assert.equal(uk.description, 4); assert.equal(uk.date, 0);
+  const vd = guessColumns(['Date', 'Value Date', 'Text', 'Debit', 'Credit']);
+  assert.equal(vd.amount, -1); assert.equal(vd.out, 3); assert.equal(vd.in, 4); assert.equal(vd.description, 2);
+  const simple = guessColumns(['Date', 'Description', 'Amount', 'Running Bal.']);
+  assert.equal(simple.amount, 2);
+});
+
 console.log(`\n${passed} tests passed`);
