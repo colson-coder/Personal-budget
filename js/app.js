@@ -4,6 +4,7 @@
 // index.html as a module.
 // =============================================================================
 
+import { isDemo, startDemo, endDemo } from './demo.js';
 import { db, isLocalMode, setLocalMode } from './db.js';
 import { applyRecurring } from './recurring.js';
 import { defineRoute, setNotFound, initRouter, navigate } from './router.js';
@@ -33,6 +34,12 @@ const app = document.getElementById('app');
 document.title = CONFIG.APP_NAME;
 
 async function boot() {
+  // index.html?demo=1 (the landing page's "Try the demo") starts the demo.
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('demo')) {
+    startDemo();
+    history.replaceState(null, '', location.pathname + '#/dashboard');
+  }
   // Are we authenticated, or in local mode? If neither, show the auth screen.
   let authed = false;
   if (isLocalMode()) {
@@ -81,8 +88,13 @@ async function boot() {
 function renderShell() {
   app.replaceChildren();
 
-  // Persistent local-mode banner.
-  if (isLocalMode()) {
+  // Persistent local-mode banner (or the demo banner).
+  if (isDemo()) {
+    app.append(el('div', { class: 'local-banner demo-banner', role: 'status' }, [
+      el('span', {}, 'You’re trying a demo with sample data. '),
+      el('button', { class: 'link-inline', onClick: leaveDemo }, 'Start my own →'),
+    ]));
+  } else if (isLocalMode()) {
     app.append(el('div', { class: 'local-banner', role: 'status' },
       'Local mode — data is stored only on this device and will not sync.'));
   }
@@ -92,7 +104,7 @@ function renderShell() {
     ...navItems().map((n) => navLink(n, 'side')),
     el('div', { class: 'sidenav-spacer' }),
     el('button', { class: 'btn btn-ghost btn-block signout', onClick: signOut },
-      isLocalMode() ? 'Exit local mode' : 'Sign out'),
+      isDemo() ? 'Exit demo' : isLocalMode() ? 'Exit local mode' : 'Sign out'),
   ]);
 
   const outlet = el('main', { class: 'outlet', id: 'outlet' });
@@ -144,7 +156,14 @@ function highlightNav(path) {
 // Feature toggles in Settings rebuild the nav without a reload.
 window.addEventListener('pb:settings-changed', () => renderShell());
 
+function leaveDemo() {
+  endDemo();
+  location.hash = '';
+  boot();
+}
+
 async function signOut() {
+  if (isDemo()) return leaveDemo();
   try {
     if (isLocalMode()) {
       setLocalMode(false);

@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { db, setLocalMode } from '../db.js';
+import { startDemo } from '../demo.js';
 import { el, toast } from '../util.js';
 import { CONFIG } from '../config.js';
 
@@ -70,6 +71,11 @@ export function renderAuth(onAuthed) {
       }, 'Skip login (local mode)'),
       el('p', { class: 'auth-hint' },
         'Local mode stores everything only on this device and will not sync.'),
+      el('button', {
+        class: 'btn btn-ghost btn-block auth-demo',
+        type: 'button',
+        onClick: () => { startDemo(); location.hash = '#/dashboard'; onAuthed(); },
+      }, 'Try a demo with sample data'),
       el('p', { class: 'auth-hint' }, [el('a', { href: './welcome.html' }, `What is ${CONFIG.APP_NAME}?`)]),
     ]);
 

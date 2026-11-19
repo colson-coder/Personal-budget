@@ -143,14 +143,18 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
     // 4. Clear expensive debt, highest rate first.
     if (expensive.length) {
       const top = expensive[0];
-      const extra = Math.max(25, Math.round((income * 0.2 - avg('debt')) / 5) * 5, 0) || 50;
+      // Arkad's plan: 20% of income to debts. The extra is what it takes to get
+      // there from today's payments (at least 25).
+      const toTwenty = Math.round((income * 0.2 - avg('debt')) / 5) * 5;
+      const extra = Math.max(25, toTwenty) || 50;
+      const why20 = toTwenty >= 25 ? ` That brings your debt payments to 20% of income, as in Arkad’s plan.` : '';
       const base = projectDebt(top.l.balance, top.apr, top.l.minimum, 0);
       const more = projectDebt(top.l.balance, top.apr, top.l.minimum, extra);
       const saved = base.interest - more.interest;
       return S(4, { tone: 'tip', score: 76, href: '#/debts',
         title: `Next: pay off ${top.d.name} (${top.apr}%)`,
         body: `It has your highest rate${expensive.length > 1 ? ' of ' + expensive.length + ' expensive debts' : ''}. Pay the minimum on everything else and put any extra here.`
-          + (isFinite(saved) && saved > 1 ? ` Adding ${fmt(extra)} a month clears it ${base.months - more.months} months sooner and saves about ${fmt(saved)} in interest.` : ''),
+          + (isFinite(saved) && saved > 1 ? ` Adding ${fmt(extra)} a month clears it ${base.months - more.months} months sooner and saves about ${fmt(saved)} in interest.${why20}` : ''),
         why: 'Highest interest first (the avalanche method)' });
     }
 

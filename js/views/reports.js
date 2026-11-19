@@ -7,7 +7,7 @@
 // =============================================================================
 
 import { db } from '../db.js';
-import { el, fmtUSD, todayISO, monthLabel, prevMonthYM } from '../util.js';
+import { el, fmtUSD, todayISO, monthLabel, prevMonthYM, shortDate } from '../util.js';
 
 export async function renderReports() {
   const [categories, allTx] = await Promise.all([
@@ -53,7 +53,20 @@ export async function renderReports() {
 // --- Month in Review (Monarch-style narrative digest) ------------------------
 function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
   const cur = months.get(thisMonth) || { income: 0, expense: 0, byCat: new Map() };
-  const prev = months.get(lastMonth) || { income: 0, expense: 0, byCat: new Map() };
+  // Compare like with like: last month up to the same day as today, so a
+  // half-finished month doesn't always look cheaper.
+  const day = todayISO().slice(8, 10);
+  const prev = { income: 0, expense: 0, byCat: new Map() };
+  for (const t of allTx) {
+    if (t.date.slice(0, 7) !== lastMonth || t.date.slice(8, 10) > day) continue;
+    const v = Number(t.amount_usd) || 0;
+    if (t.type === 'income') { if (t.subtype !== 'deposit') prev.income += v; }
+    else if (t.type === 'expense' && t.subtype !== 'deposit') {
+      prev.expense += v;
+      prev.byCat.set(t.category_id, (prev.byCat.get(t.category_id) || 0) + v);
+    }
+  }
+  const hadLastMonth = months.has(lastMonth);
 
   const card = el('div', { class: 'card' }, [
     el('h2', {}, `Month in review — ${monthLabel(thisMonth)}`),
@@ -64,8 +77,8 @@ function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
   const deltaPct = prev.expense > 0 ? Math.round((delta / prev.expense) * 100) : null;
   card.append(stat('Spent so far', fmtUSD(cur.expense),
     prev.expense > 0
-      ? `${delta >= 0 ? '▲' : '▼'} ${fmtUSD(Math.abs(delta))}${deltaPct !== null ? ` (${Math.abs(deltaPct)}%)` : ''} vs ${monthLabel(lastMonth)}`
-      : 'no data for last month',
+      ? `${delta >= 0 ? '▲' : '▼'} ${fmtUSD(Math.abs(delta))}${deltaPct !== null ? ` (${Math.abs(deltaPct)}%)` : ''} vs the same point in ${monthLabel(lastMonth).split(' ')[0]}`
+      : hadLastMonth ? `nothing spent by this point in ${monthLabel(lastMonth).split(' ')[0]}` : 'no data for last month',
     delta > 0 ? 'neg' : 'pos'));
 
   // Savings rate
@@ -80,7 +93,7 @@ function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
     .sort((a, b) => (b.amount_usd || 0) - (a.amount_usd || 0))[0];
   if (biggest) {
     card.append(stat('Largest expense', fmtUSD(biggest.amount_usd),
-      `${biggest.description || catById.get(biggest.category_id)?.name || ''} · ${biggest.date}`, 'neg'));
+      `${biggest.description || catById.get(biggest.category_id)?.name || ''} · ${shortDate(biggest.date)}`, 'neg'));
   }
 
   // Top category movers vs last month
@@ -101,7 +114,7 @@ function monthInReviewCard(months, thisMonth, lastMonth, catById, allTx) {
       ]));
     }
     card.append(el('div', { class: 'stat-block' }, [
-      el('div', { class: 'summary-label' }, 'Biggest changes vs last month'), list,
+      el('div', { class: 'summary-label' }, 'Biggest changes vs this point last month'), list,
     ]));
   }
 
