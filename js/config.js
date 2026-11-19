@@ -36,6 +36,9 @@ export const CONFIG = {
   // Settings → Log card purchases offers a one-tap "Get the shortcut" button.
   SHORTCUT_URL: '',
 
+  // Where "Send feedback" and the privacy page send people (public issues page).
+  FEEDBACK_URL: 'https://github.com/colson-coder/Personal-budget/issues/new',
+
   // Currencies the app can log. Add more here later — nothing else hard-codes
   // this list. USD is the base/reference currency for all stored balances.
   // Replaced at boot by the currencies chosen in setup (Settings → Currencies).

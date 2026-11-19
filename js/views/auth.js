@@ -76,7 +76,10 @@ export function renderAuth(onAuthed) {
         type: 'button',
         onClick: () => { startDemo(); location.hash = '#/dashboard'; onAuthed(); },
       }, 'Try a demo with sample data'),
-      el('p', { class: 'auth-hint' }, [el('a', { href: './welcome.html' }, `What is ${CONFIG.APP_NAME}?`)]),
+      el('p', { class: 'auth-hint' }, [
+        el('a', { href: './welcome.html' }, `What is ${CONFIG.APP_NAME}?`), ' · ',
+        el('a', { href: './privacy.html' }, 'Privacy'),
+      ]),
     ]);
 
     form.addEventListener('submit', async (e) => {

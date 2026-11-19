@@ -67,11 +67,11 @@ needed to look around.
 - [x] Landing page with real screenshots and a demo
 - [x] Works on iPhone, Android and desktop; installable
 - [x] Sign-in fixed (database permissions)
-- [ ] **[you]** A **privacy policy** and short **terms**. A draft is in
-      `docs/privacy-draft.md`; it needs a contact email. Both are required for
-      Product Hunt and any app store, and expected by users.
-- [ ] **[you]** A **contact or feedback channel**, e.g. a dedicated email or a
-      simple form, so a "Send feedback" link can go in Settings.
+- [x] **Privacy page** (`privacy.html`), linked from the landing page and the
+      sign-in screen. Its contact is the public GitHub Issues page, so no
+      personal email is needed. Switch to a dedicated email later if you like.
+- [x] **Feedback:** Settings → Help us improve → Send feedback (GitHub Issues),
+      plus a Feedback link on the landing page.
 - [ ] **[you]** Optional: your own **domain** (e.g. babylonspurse.com, about
       $12 a year). It looks more trustworthy than a github.io address. GitHub
       Pages supports custom domains for free.
@@ -106,11 +106,16 @@ business and tax details.
 **Suggested order:** launch free → collect feedback for a few weeks → add
 Premium with the AI coach first. It's already built and just needs switching on.
 
-## 6. Open questions for the owner
+## 6. Decisions made
+
+- **Stay free for now.** Launch free, gather feedback for a few weeks, then
+  decide on Premium (proposal above).
+- **Contact = GitHub Issues** for now (`CONFIG.FEEDBACK_URL`), with no personal
+  email.
+
+## 7. Still open (when you want)
 
 1. Is the target audience in section 2 right, or is there a group you'd rather
    start with?
 2. Do you want your own domain name?
-3. Which contact email should go in the privacy policy and on a feedback link?
-4. Do you agree with the Premium proposal (what's in it, about $4/month), or
-   should we stay completely free for now?
+3. A dedicated contact email, if you'd prefer it to GitHub Issues.
