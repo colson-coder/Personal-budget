@@ -28,7 +28,8 @@
 // A higher score means more important, and the list comes back sorted.
 // =============================================================================
 
-import { addMonths, monthSummary, debtLedger, projectDebt, taxSummary, r2 } from './finance.js';
+import { addMonths, monthSummary, debtLedger, projectDebt, taxSummary, goalPace, r2 } from './finance.js';
+import { merchantKey } from './importer.js';
 
 const ymOf = (t) => (t.date || '').slice(0, 7);
 const usd = (t) => Number(t.amount_usd) || 0;
@@ -143,14 +144,18 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
     // 4. Clear expensive debt, highest rate first.
     if (expensive.length) {
       const top = expensive[0];
-      const extra = Math.max(25, Math.round((income * 0.2 - avg('debt')) / 5) * 5, 0) || 50;
+      // Arkad's plan: 20% of income to debts. The extra is what it takes to get
+      // there from today's payments (at least 25).
+      const toTwenty = Math.round((income * 0.2 - avg('debt')) / 5) * 5;
+      const extra = Math.max(25, toTwenty) || 50;
+      const why20 = toTwenty >= 25 ? ` That brings your debt payments to 20% of income, as in Arkad’s plan.` : '';
       const base = projectDebt(top.l.balance, top.apr, top.l.minimum, 0);
       const more = projectDebt(top.l.balance, top.apr, top.l.minimum, extra);
       const saved = base.interest - more.interest;
       return S(4, { tone: 'tip', score: 76, href: '#/debts',
         title: `Next: pay off ${top.d.name} (${top.apr}%)`,
         body: `It has your highest rate${expensive.length > 1 ? ' of ' + expensive.length + ' expensive debts' : ''}. Pay the minimum on everything else and put any extra here.`
-          + (isFinite(saved) && saved > 1 ? ` Adding ${fmt(extra)} a month clears it ${base.months - more.months} months sooner and saves about ${fmt(saved)} in interest.` : ''),
+          + (isFinite(saved) && saved > 1 ? ` Adding ${fmt(extra)} a month clears it ${base.months - more.months} months sooner and saves about ${fmt(saved)} in interest.${why20}` : ''),
         why: 'Highest interest first (the avalanche method)' });
     }
 
@@ -195,6 +200,22 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
       title: `Your extra savings could pay down ${expensive[0].d.name}`,
       body: `You have about ${fmt(spare)} beyond a 3-month cushion while ${expensive[0].d.name} charges ${expensive[0].apr}%. Paying it down earns that rate, with no risk.`,
       why: 'Highest interest first' });
+  }
+
+  // ---- Goals with a date: falling behind? --------------------------------------------
+  const targets = settings.fund_targets || {};
+  const late = funds
+    .map((f) => ({ f, p: goalPace(f, targets[f.fund.id], todayYM) }))
+    .filter((x) => x.p && (x.p.status === 'behind' || x.p.status === 'overdue'))
+    .sort((a, b) => (b.p.perMonth - b.p.pace) - (a.p.perMonth - a.p.pace))[0];
+  if (late) {
+    const { f, p } = late;
+    add({ id: 'goal-' + f.fund.id, tone: 'tip', score: 44, href: '#/funds',
+      title: p.status === 'overdue' ? `${f.fund.name}: the target date has passed` : `${f.fund.name} is behind schedule`,
+      body: p.status === 'overdue'
+        ? `${fmt(p.left)} is still to go. Pick a new date, or put more toward it each month.`
+        : `To reach it on time, save ${fmt(p.perMonth)} a month. Lately it’s been growing by about ${fmt(Math.max(0, p.pace))}. Add a fixed plan rule for it, or move the date.`,
+      why: 'A goal with a date becomes a plan' });
   }
 
   // ---- Taxes: is enough being set aside? ---------------------------------------------
@@ -262,6 +283,17 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
       why: `${BABYLON} · tell needs from wants` });
   }
 
+  // ---- Subscriptions: small repeating charges add up ---------------------------------
+  const subs = detectRepeats(txs, { todayYM, rules: data.recurring || [] })
+    .filter((r) => r.type === 'expense' && catById.get(r.category_id)?.kind !== 'hard' && r.monthlyUSD < 200);
+  if (subs.length >= 2) {
+    const total = subs.reduce((a, r) => a + r.monthlyUSD, 0);
+    add({ id: 'subs', tone: 'tip', score: 30, href: '#/add',
+      title: `${subs.length} repeating charges cost ${fmt(total)} a month`,
+      body: `${subs.slice(0, 3).map((r) => r.description).join(', ')}${subs.length > 3 ? ' and more' : ''}. That’s ${fmt(total * 12)} a year. Cancel any you no longer use, and make the rest recurring so they’re logged automatically.`,
+      why: `${BABYLON} · control your spending` });
+  }
+
   // ---- No plan rules yet: automate paying yourself first ------------------------------
   if (m.plan && !(settings.plan?.rules || []).length && income > 0 && step?.id !== 'step-2') {
     add({ id: 'no-rules', tone: 'tip', score: 48, href: '#/settings',
@@ -315,4 +347,49 @@ export function financeSnapshot(data, { today = null } = {}) {
   }
   snap.app_tips_showing = buildInsights(data, { today }).map((x) => x.title);
   return snap;
+}
+
+// --- Repeating charges ----------------------------------------------------------------
+// Finds things that happen every month at about the same amount and day
+// (Netflix, a gym, rent, a paycheck) and aren't recurring rules yet. A group
+// counts when it shows up in at least 3 of the last 4 months (this month
+// included), most recently this month or last month, with amounts within ~15%
+// and days within a week of each other.
+export function detectRepeats(txs, { rules = [], todayYM, dismissed = [] } = {}) {
+  const window = [-3, -2, -1, 0].map((k) => addMonths(todayYM, k));
+  const ruleKeys = new Set(rules.map((r) => merchantKey(r.description)).filter(Boolean));
+  const groups = new Map();
+  for (const t of txs) {
+    if ((t.type !== 'expense' && t.type !== 'income') || t.fund_id || t.debt_id || t.subtype) continue;
+    const ym = ymOf(t);
+    if (!window.includes(ym)) continue;
+    const key = merchantKey(t.description);
+    if (!key) continue;
+    const g = `${t.type}|${key}|${t.currency}`;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(t);
+  }
+  const out = [];
+  for (const [g, list] of groups) {
+    const key = g.split('|')[1];
+    if (ruleKeys.has(key) || dismissed.includes(key)) continue;
+    const byMonth = new Map();
+    for (const t of list) if (!byMonth.has(ymOf(t))) byMonth.set(ymOf(t), t); // one per month
+    if (byMonth.size < 3 || byMonth.size !== list.length) continue; // several a month = not a bill
+    const months = [...byMonth.keys()].sort();
+    const last = months[months.length - 1];
+    if (last < addMonths(todayYM, -1)) continue;
+    const amounts = [...byMonth.values()].map((t) => Number(t.amount));
+    if (Math.max(...amounts) > Math.min(...amounts) * 1.15) continue;
+    const days = [...byMonth.values()].map((t) => Number(t.date.slice(8, 10))).sort((a, b) => a - b);
+    if (days[days.length - 1] - days[0] > 7) continue;
+    const latest = byMonth.get(last);
+    out.push({
+      key, type: latest.type, description: latest.description, amount: Number(latest.amount),
+      currency: latest.currency, category_id: latest.category_id,
+      day: days[Math.floor(days.length / 2)], lastYM: last,
+      monthlyUSD: r2(Number(latest.amount_usd) || 0),
+    });
+  }
+  return out.sort((a, b) => b.monthlyUSD - a.monthlyUSD);
 }

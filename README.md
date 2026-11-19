@@ -36,6 +36,11 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
   reserve), and *% of what's left* with a different % once a fund's goal is
   reached (e.g. 25% to the emergency fund until it hits its goal). The Plan
   page shows cash flow, where every dollar goes, and a month-by-month table.
+- **Try a demo** — sample data generated relative to today, from the sign-in
+  screen or `index.html?demo=1`. Existing device-only data is backed up and
+  restored afterwards.
+- **Goal dates** — a fund's "reach it by" month gives a per-month target and
+  on-track or behind status (`finance.goalPace`).
 - **Funds** — emergency fund, giving, reserves, spending money: balances grow
   from the plan and deposits, shrink when you spend from them. Each fund says
   where the money is kept: in an account that pays interest (estimated from
@@ -99,7 +104,8 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 - **Search** — free-text description search plus exact-amount lookup on the
   transactions page.
 - **Your data, always** — one-tap JSON backup and CSV export (re-importable);
-  local-mode restores from JSON backups.
+  local-mode restores from JSON backups; "Delete all my data" with typed
+  confirmation.
 - **Import** — bank files in CSV/TSV/OFX/QFX, in any column layout and
   number format (`1,234.56`, `1.234,56`, separate debit/credit columns,
   headers in several languages). Column mappings are remembered per bank.
@@ -137,7 +143,7 @@ installable as a standalone **PWA** on Mac, iPhone, Android and Windows.
 │       ├── dashboard.js  transactions.js  add.js  reports.js
 │       ├── plan.js  funds.js  debts.js  income.js  taxes.js
 │       └── categories.js  import.js  more.js
-├── tests/                    # node tests/<name>.test.mjs — finance (19), importer (8), insights (13)
+├── tests/                    # node tests/<name>.test.mjs — finance (20), importer (8), insights (14)
 ├── supabase/functions/coach/ # Optional AI coach Edge Function (off by default)
 ├── icons/                    # PWA icons (192, 512, 180 apple-touch)
 └── sql/

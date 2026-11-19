@@ -44,6 +44,13 @@ from a passive income stream.
 *Recurring* (bottom of the page): set rent, salary or subscriptions once and
 they're added automatically every month.
 
+**Repeats** — On the Add page, under *Recurring*, the app points out things
+that already happen every month at about the same amount and day, like Netflix,
+rent or your paycheck. **Make recurring** logs them automatically from then on,
+without adding this month's charge twice. **Not a repeat** hides the suggestion.
+The Coach also adds up your repeating charges so you can cancel what you don't
+use.
+
 **Budgets** — A monthly limit per category. The top shows *Budgeted · Spent ·
 Left*. Categories are grouped into Bills, Everyday spending, Debt payments,
 Taxes and Income; only the ones you're using are shown, the rest sit under
@@ -73,6 +80,10 @@ them anytime. Each fund says where the money is kept:
 - *Account that pays interest — estimate it* (enter the APY)
 - *Account that pays interest — I'll enter what I get*
 - *Cash / checking* — earns nothing
+
+Give a fund a **goal** and a **"reach it by" month**, and the card tells you how
+much to save each month, and whether you're on track or behind at your recent
+pace.
 Spending from a fund doesn't count against your monthly plan, because that
 money was already set aside.
 
@@ -111,8 +122,17 @@ and category. See [auto-logging.md](auto-logging.md).
 currencies, which features to show, your money plan, automatic purchase
 logging, backup/export, and "Run setup again".
 
+## Trying it out
+
+**Try a demo with sample data** (on the sign-in screen, or *Try the demo* on
+the landing page) opens the app with a made-up person's last few months. Look
+around, then tap **Start my own** in the banner. If you already had device-only
+data, it's put back exactly as it was.
+
 ## Accounts & your data
 - **With an account**, your data syncs across your phone and computer.
   Each person can only ever see their own data.
 - **Local mode** (no account) keeps everything on that one device only.
 - **Backup** anytime in Settings → Your data (JSON backup or CSV export).
+- **Delete all my data** in the same place. Type DELETE to confirm. Your sign-in
+  stays so you can start over.

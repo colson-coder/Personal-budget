@@ -54,8 +54,13 @@ async function renderCurrent() {
     console.error('Route render failed:', err);
     const div = document.createElement('div');
     div.className = 'card error-card';
-    div.textContent = 'Something went wrong loading this page: ' + (err.message || err);
+    div.textContent = !navigator.onLine || /failed to fetch|network/i.test(String(err?.message || err))
+      ? 'You’re offline, so your synced data can’t load right now. Reconnect and this page will work again.'
+      : 'Something went wrong loading this page: ' + (err.message || err);
     outlet.append(div);
   }
   if (onNavigate) onNavigate(path);
 }
+
+// Coming back online: re-render whatever page is open.
+window.addEventListener('online', () => { if (outlet?.querySelector('.error-card')) renderCurrent(); });

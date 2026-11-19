@@ -494,3 +494,24 @@ export function taxSummary({ tax: taxIn, txs, catById, interestByMonth, todayYM 
     periods,
   };
 }
+
+// --- Goal dates -----------------------------------------------------------------------
+// A fund with a goal and a "reach it by" month: how much to save each month,
+// and whether recent saving is on pace. `f` is one entry of simulateFunds().funds.
+// Pace = average net growth (plan + deposits + interest − spending) over the
+// last up-to-3 complete months.
+export function goalPace(f, targetYM, todayYM) {
+  const goal = Number(f?.goal) || 0;
+  if (!(goal > 0) || !/^\d{4}-\d{2}$/.test(targetYM || '')) return null;
+  const left = Math.max(0, goal - f.balance);
+  if (left <= 0.005) return { status: 'reached', left: 0, perMonth: 0, monthsLeft: 0, pace: 0, projectedYM: null };
+  // Months left, counting the current month: Nov → Dec is 2 months of saving.
+  const monthsLeft = monthRange(todayYM, targetYM).length;
+  if (targetYM < todayYM) return { status: 'overdue', left: r2(left), perMonth: r2(left), monthsLeft: 0, pace: 0, projectedYM: null };
+  const done = (f.history || []).filter((h) => h.ym < todayYM).slice(-3);
+  const pace = done.length ? done.reduce((a, h) => a + (h.end - h.start), 0) / done.length : 0;
+  const perMonth = left / monthsLeft;
+  const projectedYM = pace > 0 ? addMonths(todayYM, Math.ceil(left / pace) - 1) : null;
+  const status = !done.length ? 'new' : pace + 0.005 >= perMonth ? 'on_track' : 'behind';
+  return { status, left: r2(left), perMonth: r2(perMonth), monthsLeft, pace: r2(pace), projectedYM };
+}

@@ -288,6 +288,25 @@ export function dataCard() {
   }
 
   card.append(actions);
+
+  // Delete everything (typed confirmation). The sign-in stays.
+  const wipe = el('button', { class: 'btn btn-sm btn-ghost danger' }, 'Delete all my data…');
+  wipe.addEventListener('click', async () => {
+    const answer = prompt(`This permanently deletes all your transactions, budgets, funds, debts and settings${isLocalMode() ? ' on this device' : ' in your account'}. Download a backup first if you might want it.\n\nType DELETE to confirm.`);
+    if ((answer || '').trim().toUpperCase() !== 'DELETE') return;
+    wipe.disabled = true;
+    try {
+      await db.deleteAllData();
+      localStorage.removeItem('pb_last_currency');
+      toast('All your data was deleted', 'info');
+      location.hash = '';
+      location.reload();
+    } catch (err) {
+      toast('Could not delete: ' + (err.message || 'error'), 'error');
+      wipe.disabled = false;
+    }
+  });
+  card.append(el('div', { class: 'data-danger' }, [wipe]));
   return card;
 }
 

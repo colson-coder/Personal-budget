@@ -83,12 +83,13 @@ async function safeList(table) {
 
 // Everything the finance pages need, fetched in parallel.
 export async function loadAll() {
-  const [categories, txs, funds, debts, streams] = await Promise.all([
+  const [categories, txs, funds, debts, streams, recurring] = await Promise.all([
     db.listCategories(),
     db.listTransactions(),
     safeList('funds'),
     safeList('debts'),
     safeList('income_streams'),
+    db.listRecurring().catch(() => []),
   ]);
   const catById = new Map(categories.map((c) => [c.id, {
     ...c, kind: kindOf(c),
@@ -96,7 +97,7 @@ export async function loadAll() {
   }]));
   const todayYM = todayISO().slice(0, 7);
   const sim = simulateFunds({ settings, funds, txs, catById, todayYM });
-  return { settings, categories, catById, txs, funds, debts, streams, sim, todayYM };
+  return { settings, categories, catById, txs, funds, debts, streams, recurring, sim, todayYM };
 }
 
 // Find a category by name, creating it (with a kind) if missing.

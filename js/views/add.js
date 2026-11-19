@@ -10,6 +10,7 @@ import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
 import { guessCategory } from './import.js';
 import { merchantKey, parseAmount } from '../importer.js';
+import { detectRepeats } from '../insights.js';
 
 export async function renderAdd(params = {}) {
   const safe = (t) => db.list(t).catch(() => []);
@@ -176,8 +177,10 @@ export async function renderAdd(params = {}) {
       if (pick) categorySel.value = pick;
       else if (byName.get('other') && !typeIncome.checked) categorySel.value = byName.get('other').id;
     }
-    root.querySelector('.view-head')?.append(
-      el('p', { class: 'muted hint' }, 'Filled in from a quick-add link — check it and tap Save.'));
+    if (params.auto !== '1') {
+      root.querySelector('.view-head')?.after(
+        el('p', { class: 'muted hint quick-hint' }, 'Filled in from your phone. Check it and tap Save.'));
+    }
   }
 
   form.addEventListener('submit', async (e) => {
@@ -198,11 +201,14 @@ export async function renderAdd(params = {}) {
       // Convert using the rate for THIS transaction's date. Throws on failure,
       // which blocks the save rather than storing a bad conversion.
       const { amount_usd, exchange_rate } = await convertToUSD(amount, currency, date);
-      await db.createTransaction({
+      const saved = await db.createTransaction({
         type, date, amount, currency, amount_usd, exchange_rate,
         category_id, description: descInput.value.trim(),
         ...linkFields(type),
       });
+      // Saved from a quick-add link without a tap: show what happened, with Undo
+      // (also guards against someone else's link adding an entry).
+      if (fromLink && params.auto === '1' && saved?.id) showUndo(saved, categorySel.selectedOptions[0]?.textContent);
       localStorage.setItem('pb_last_currency', currency);
       // Learn the shop → category pairing (shared with bank import), so the
       // next purchase there is categorised the same way.
@@ -212,7 +218,7 @@ export async function renderAdd(params = {}) {
       }
       // Stay on the page for rapid entry: clear amount/description, keep
       // category/currency/date, refocus amount.
-      toast('Saved — add another or head to the dashboard', 'success');
+      if (!(fromLink && params.auto === '1')) toast('Saved — add another or head to the dashboard', 'success');
       amountInput.value = '';
       descInput.value = '';
       fundSel.value = ''; debtSel.value = ''; streamSel.value = '';
@@ -229,6 +235,24 @@ export async function renderAdd(params = {}) {
 
   root.append(form);
 
+  function showUndo(t, catName) {
+    const bar = el('div', { class: 'card undo-bar', role: 'status' }, [
+      el('div', {}, [
+        el('div', { class: 'undo-title' }, `Logged ${t.description || 'purchase'}`),
+        el('div', { class: 'muted small' }, `${Number(t.amount).toLocaleString()} ${t.currency} · ${catName || ''}`),
+      ]),
+      el('div', { class: 'undo-actions' }, [
+        el('a', { class: 'btn btn-sm', href: '#/transactions' }, 'Change'),
+        el('button', { class: 'btn btn-sm btn-ghost', onClick: async () => {
+          await db.deleteTransaction(t.id);
+          bar.replaceChildren(el('div', { class: 'muted small' }, 'Removed. Nothing was saved.'));
+        } }, 'Undo'),
+      ]),
+    ]);
+    root.querySelector('.undo-bar')?.remove();
+    form.before(bar);
+  }
+
   if (fromLink && params.auto === '1' && Number(amountInput.value) > 0 && categorySel.value) {
     // Wait until the form is on the page (a detached form can't submit).
     const trySubmit = (n = 0) => form.isConnected ? form.requestSubmit() : n < 50 && setTimeout(() => trySubmit(n + 1), 50);
@@ -238,12 +262,12 @@ export async function renderAdd(params = {}) {
   // --- Recurring rules (auto-tracking) ---------------------------------------
   // Rent, salary, subscriptions: set once, and the app records them on their
   // day every month automatically (see js/recurring.js).
-  root.append(await recurringCard(categories));
+  root.append(await recurringCard(categories, history));
 
   return root;
 }
 
-async function recurringCard(categories) {
+async function recurringCard(categories, history = []) {
   const card = el('div', { class: 'card' });
 
   async function reload() {
@@ -259,6 +283,40 @@ async function recurringCard(categories) {
     );
 
     const catById = new Map(categories.map((c) => [c.id, c]));
+
+    // Suggestions: things that already repeat every month in the history.
+    const todayYM = todayISO().slice(0, 7);
+    const repeats = detectRepeats(history, { rules, todayYM, dismissed: getSettings().repeat_dismissed || [] });
+    if (repeats.length) {
+      card.append(el('div', { class: 'repeat-box' }, [
+        el('div', { class: 'repeat-title' }, 'Looks like these repeat every month'),
+        ...repeats.slice(0, 5).map((r) => el('div', { class: 'rec-row repeat-row' }, [
+          el('div', { class: 'rec-main' }, [
+            el('span', { class: 'rec-desc' }, r.description),
+            el('span', { class: 'rec-meta' }, `About day ${r.day} · ${catById.get(r.category_id)?.name ?? '—'} · ${Number(r.amount).toLocaleString()} ${r.currency}`),
+          ]),
+          el('div', { class: 'repeat-actions' }, [
+            el('button', { class: 'btn btn-sm btn-primary', onClick: async (e) => {
+              e.currentTarget.disabled = true;
+              try {
+                // last_applied = the latest month already logged, so it isn't added twice.
+                await db.createRecurring({
+                  type: r.type, amount: r.amount, currency: r.currency, category_id: r.category_id,
+                  day_of_month: r.day, description: r.description, last_applied: r.lastYM, active: true,
+                });
+                toast(`${r.description} will be logged automatically each month`, 'success');
+                reload();
+              } catch (err) { toast('Could not add: ' + (err.message || 'error'), 'error'); }
+            } }, 'Make recurring'),
+            el('button', { class: 'btn btn-sm btn-ghost', title: 'Not a repeat', onClick: async () => {
+              await saveSettings({ repeat_dismissed: [...(getSettings().repeat_dismissed || []), r.key] });
+              reload();
+            } }, 'Not a repeat'),
+          ]),
+        ])),
+      ]));
+    }
+
     if (!rules.length) {
       card.append(el('p', { class: 'muted' }, 'No recurring transactions yet.'));
     }

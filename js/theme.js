@@ -9,15 +9,28 @@ export const THEMES = [
   { value: 'midnight', label: 'Midnight Pro', desc: 'Calm dark emerald', swatch: ['#0f141b', '#10b981', '#34d399'] },
   { value: 'light', label: 'Clean Light', desc: 'Bright, banking style', swatch: ['#f6f7f9', '#0f766e', '#0f172a'] },
   { value: 'bold', label: 'Fintech Bold', desc: 'Gradients, big numbers', swatch: ['#06090f', '#34d399', '#06b6d4'] },
+  { value: 'auto', label: 'Match my device', desc: 'Light or Mono, following your phone', swatch: ['#f6f7f9', '#000', '#ededed'] },
 ];
 export const DEFAULT_THEME = 'mono';
 
 const META_COLORS = { mono: '#000000', midnight: '#090c11', light: '#f6f7f9', bold: '#06090f' };
 
-export function applyTheme(name) {
-  const t = THEMES.some((x) => x.value === name) ? name : DEFAULT_THEME;
+// 'auto' follows the device: Clean Light in light mode, Minimal Mono in dark.
+const lightQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: light)') : null;
+const resolve = (name) => (name === 'auto' ? (lightQuery?.matches ? 'light' : 'mono') : name);
+let chosen = DEFAULT_THEME;
+lightQuery?.addEventListener?.('change', () => { if (chosen === 'auto') paint('auto'); });
+
+function paint(name) {
+  const t = resolve(name);
   document.documentElement.dataset.theme = t;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', META_COLORS[t]);
+}
+
+export function applyTheme(name) {
+  const t = THEMES.some((x) => x.value === name) ? name : DEFAULT_THEME;
+  chosen = t;
+  paint(t);
   try { localStorage.setItem('pb_theme', t); } catch { /* private mode: fine */ }
   return t;
 }

@@ -214,6 +214,17 @@ const supabaseBackend = {
     if (error) throw error;
   },
 
+  // Delete every row this user owns (RLS limits each delete to their rows).
+  // The sign-in itself stays, so they can start over.
+  async deleteAllData() {
+    const client = await sb();
+    const user = await this.requireUser();
+    for (const t of ['transactions', 'recurring', 'funds', 'debts', 'income_streams', 'categories', 'settings']) {
+      const { error } = await client.from(t).delete().eq('user_id', user.id);
+      if (error && !/does not exist/i.test(error.message)) throw error;
+    }
+  },
+
   // --- settings (one JSON document per user) -----------------------------------
   async getSettings() {
     const client = await sb();
@@ -481,6 +492,12 @@ const localBackend = {
     lsWrite(LS_REC, arr(data.recurring));
     for (const t of TABLES) lsWrite(LS_PREFIX + t, arr(data[t]));
     if (data.settings) localStorage.setItem(LS_SETTINGS, JSON.stringify(data.settings));
+  },
+
+  async deleteAllData() {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith(LS_PREFIX) && k !== 'pb_local_mode') localStorage.removeItem(k);
+    }
   },
 
   async seedDefaultCategories() {
