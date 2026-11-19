@@ -2,7 +2,7 @@
 // Run with:  node tests/insights.test.mjs
 import assert from 'node:assert/strict';
 import { simulateFunds } from '../js/finance.js';
-import { buildInsights } from '../js/insights.js';
+import { buildInsights, detectRepeats } from '../js/insights.js';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('✓', name); };
@@ -124,6 +124,23 @@ test('a dated goal that is behind gets a tip', () => {
   const r = run({ txs: months(), funds: [ef(6000), trip], settings: { modules: MODS, fund_targets: { trip: '2027-02' } } });
   const g = r.find((x) => x.id === 'goal-trip');
   assert.ok(g && /behind/.test(g.title), ids(r).join(','));
+});
+
+test('repeating charges: subscriptions found, groceries and known rules skipped', () => {
+  const m4 = ['2026-08', '2026-09', '2026-10', '2026-11'];
+  const txs = [
+    ...m4.map((m) => tx('expense', m + '-04', 15.49, 'fun', { description: 'NETFLIX.COM 8XK2', currency: 'USD' })),
+    ...m4.slice(1).map((m, i) => tx('expense', m + '-0' + (5 + i), 11.99, 'fun', { description: 'Spotify', currency: 'USD' })),
+    ...m4.map((m, i) => tx('expense', m + '-1' + i, 80 + i * 30, 'food', { description: 'Whole Foods', currency: 'USD' })), // amounts vary
+    ...m4.map((m) => tx('expense', m + '-02', 1500, 'rent', { description: 'Rent', currency: 'USD' })),
+    ...['2026-07', '2026-08', '2026-09'].map((m) => tx('expense', m + '-03', 9.99, 'fun', { description: 'Old app', currency: 'USD' })), // stopped
+  ];
+  const r = detectRepeats(txs, { todayYM: '2026-11', rules: [{ description: 'Rent' }] });
+  assert.deepEqual(r.map((x) => x.description).sort(), ['NETFLIX.COM 8XK2', 'Spotify']);
+  assert.equal(r.find((x) => x.description === 'Spotify').day, 6);
+  assert.equal(detectRepeats(txs, { todayYM: '2026-11', dismissed: ['spotify'] }).some((x) => x.description === 'Spotify'), false);
+  const coach = run({ txs: [...months(), ...txs] }, '2026-11-08');
+  assert.ok(coach.some((x) => x.id === 'subs' && /2 repeating charges/.test(x.title)), coach.map((x) => x.title).join(' | '));
 });
 
 console.log(`\n${passed} insight tests passed`);

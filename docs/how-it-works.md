@@ -44,6 +44,13 @@ from a passive income stream.
 *Recurring* (bottom of the page): set rent, salary or subscriptions once and
 they're added automatically every month.
 
+**Repeats** — On the Add page, under *Recurring*, the app points out things
+that already happen every month at about the same amount and day, like Netflix,
+rent or your paycheck. **Make recurring** logs them automatically from then on,
+without adding this month's charge twice. **Not a repeat** hides the suggestion.
+The Coach also adds up your repeating charges so you can cancel what you don't
+use.
+
 **Budgets** — A monthly limit per category. The top shows *Budgeted · Spent ·
 Left*. Categories are grouped into Bills, Everyday spending, Debt payments,
 Taxes and Income; only the ones you're using are shown, the rest sit under

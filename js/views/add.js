@@ -10,6 +10,7 @@ import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
 import { guessCategory } from './import.js';
 import { merchantKey, parseAmount } from '../importer.js';
+import { detectRepeats } from '../insights.js';
 
 export async function renderAdd(params = {}) {
   const safe = (t) => db.list(t).catch(() => []);
@@ -238,12 +239,12 @@ export async function renderAdd(params = {}) {
   // --- Recurring rules (auto-tracking) ---------------------------------------
   // Rent, salary, subscriptions: set once, and the app records them on their
   // day every month automatically (see js/recurring.js).
-  root.append(await recurringCard(categories));
+  root.append(await recurringCard(categories, history));
 
   return root;
 }
 
-async function recurringCard(categories) {
+async function recurringCard(categories, history = []) {
   const card = el('div', { class: 'card' });
 
   async function reload() {
@@ -259,6 +260,40 @@ async function recurringCard(categories) {
     );
 
     const catById = new Map(categories.map((c) => [c.id, c]));
+
+    // Suggestions: things that already repeat every month in the history.
+    const todayYM = todayISO().slice(0, 7);
+    const repeats = detectRepeats(history, { rules, todayYM, dismissed: getSettings().repeat_dismissed || [] });
+    if (repeats.length) {
+      card.append(el('div', { class: 'repeat-box' }, [
+        el('div', { class: 'repeat-title' }, 'Looks like these repeat every month'),
+        ...repeats.slice(0, 5).map((r) => el('div', { class: 'rec-row repeat-row' }, [
+          el('div', { class: 'rec-main' }, [
+            el('span', { class: 'rec-desc' }, r.description),
+            el('span', { class: 'rec-meta' }, `About day ${r.day} · ${catById.get(r.category_id)?.name ?? '—'} · ${Number(r.amount).toLocaleString()} ${r.currency}`),
+          ]),
+          el('div', { class: 'repeat-actions' }, [
+            el('button', { class: 'btn btn-sm btn-primary', onClick: async (e) => {
+              e.currentTarget.disabled = true;
+              try {
+                // last_applied = the latest month already logged, so it isn't added twice.
+                await db.createRecurring({
+                  type: r.type, amount: r.amount, currency: r.currency, category_id: r.category_id,
+                  day_of_month: r.day, description: r.description, last_applied: r.lastYM, active: true,
+                });
+                toast(`${r.description} will be logged automatically each month`, 'success');
+                reload();
+              } catch (err) { toast('Could not add: ' + (err.message || 'error'), 'error'); }
+            } }, 'Make recurring'),
+            el('button', { class: 'btn btn-sm btn-ghost', title: 'Not a repeat', onClick: async () => {
+              await saveSettings({ repeat_dismissed: [...(getSettings().repeat_dismissed || []), r.key] });
+              reload();
+            } }, 'Not a repeat'),
+          ]),
+        ])),
+      ]));
+    }
+
     if (!rules.length) {
       card.append(el('p', { class: 'muted' }, 'No recurring transactions yet.'));
     }
