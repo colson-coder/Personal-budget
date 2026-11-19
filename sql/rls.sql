@@ -8,6 +8,16 @@
 -- unauthenticated request (auth.uid() is null) matches no rows at all.
 -- =============================================================================
 
+-- Table privileges. Newer Supabase projects don't grant the API roles access
+-- to tables created in the SQL editor ("permission denied for table …").
+-- Signed-in users get the basic privileges; RLS below still limits them to
+-- their own rows. The anon (signed-out) role gets nothing.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.categories, public.transactions, public.recurring, public.settings,
+  public.funds, public.debts, public.income_streams
+to authenticated;
+
 -- Enable RLS. Once enabled, the default is DENY — only rows matching a policy
 -- are accessible.
 alter table public.categories   enable row level security;
