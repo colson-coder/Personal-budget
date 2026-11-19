@@ -6,10 +6,10 @@
 
 import { db } from '../db.js';
 import { CONFIG } from '../config.js';
-import { loadAll, ensureCategory } from '../store.js';
+import { loadAll, ensureCategory, getSettings, saveSettings } from '../store.js';
 import { convertToUSD } from '../rates.js';
-import { el, fmtUSD, toast, todayISO, openSheet, field, sparkline, progress, isValidISODate } from '../util.js';
-import { interestMode } from '../finance.js';
+import { el, fmtUSD, toast, todayISO, openSheet, field, sparkline, progress, isValidISODate, shortMonth } from '../util.js';
+import { interestMode, goalPace } from '../finance.js';
 import { navigate } from '../router.js';
 
 export const FUND_KINDS = [
@@ -96,6 +96,8 @@ function fundCard(f, data) {
         el('span', { class: 'muted' }, f.leftToGoal > 0 ? `${fmtUSD(f.leftToGoal)} to go` : 'Goal reached ✓'),
       ]),
     );
+    const pace = goalPace(f, getSettings().fund_targets?.[f.fund.id], data.todayYM);
+    if (pace && pace.status !== 'reached') card.append(paceLine(pace, getSettings().fund_targets[f.fund.id]));
   }
 
   const hist = f.history.slice(-12).map((h) => h.end);
@@ -120,6 +122,20 @@ function fundCard(f, data) {
   return card;
 }
 
+// "Save $145/month to reach it by Jun 2027 · On track"
+export function paceLine(p, targetYM) {
+  const by = shortMonth(targetYM);
+  const text = p.status === 'overdue'
+    ? `The ${by} target has passed. ${fmtUSD(p.left)} still to go.`
+    : `Save ${fmtUSD(p.perMonth)}/month to reach it by ${by}.`;
+  const tag = { on_track: ['On track', 'pos'], behind: ['Behind', 'neg'], overdue: ['Set a new date', 'neg'], new: ['', ''] }[p.status] || ['', ''];
+  const detail = p.status === 'behind' && p.pace > 0 && p.projectedYM ? ` At your recent pace you’d get there in ${shortMonth(p.projectedYM)}.` : '';
+  return el('div', { class: 'goal-pace small' }, [
+    el('span', {}, text + detail),
+    tag[0] ? el('span', { class: 'goal-tag ' + tag[1] }, tag[0]) : null,
+  ]);
+}
+
 function chip(value, label, tone) {
   return el('div', { class: 'mini-stat' }, [
     el('span', { class: 'mini-value ' + (tone || '') }, value),
@@ -135,6 +151,8 @@ export function fundSheet(fund, onDone = refresh) {
     const start = el('input', { type: 'number', step: '0.01', inputmode: 'decimal', value: fund?.starting_balance ?? '', placeholder: '0.00' });
     const goal = el('input', { type: 'number', step: '1', min: '0', inputmode: 'decimal', value: fund?.goal_usd || '', placeholder: 'optional' });
     const apy = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: fund?.apy || '', placeholder: 'e.g. 4.5' });
+    // Target month lives in settings.fund_targets (no database column needed).
+    const target = el('input', { type: 'month', value: (fund && getSettings().fund_targets?.[fund.id]) || '', min: todayISO().slice(0, 7), placeholder: 'YYYY-MM' });
     const defaultMode = fund ? interestMode(fund) : 'none';
     const mode = el('select', {}, INTEREST_MODES.map((m) => el('option', { value: m.value, selected: m.value === defaultMode ? 'selected' : null }, m.label)));
     const apyField = field('Interest rate (APY %)', apy);
@@ -153,9 +171,15 @@ export function fundSheet(fund, onDone = refresh) {
       };
       if (row.interest_mode === 'auto' && !(row.apy > 0)) return toast('Enter the interest rate, or pick another option', 'error');
       if (!row.name) return toast('Give the fund a name', 'error');
+      const by = target.value.trim();
+      if (by && !/^\d{4}-\d{2}$/.test(by)) return toast('Enter the target month like 2027-06', 'error');
       save.disabled = true;
       try {
-        if (fund) await db.update('funds', fund.id, row); else await db.create('funds', row);
+        let saved;
+        if (fund) { await db.update('funds', fund.id, row); saved = fund; } else saved = await db.create('funds', row);
+        const targets = { ...(getSettings().fund_targets || {}) };
+        if (by && row.goal_usd > 0) targets[saved.id] = by; else delete targets[saved.id];
+        await saveSettings({ fund_targets: targets });
         toast(fund ? 'Fund saved' : 'Fund created', 'success');
         close(); onDone();
       } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
@@ -170,6 +194,7 @@ export function fundSheet(fund, onDone = refresh) {
         field(`Current balance (${CONFIG.BASE_CURRENCY})`, start, 'What’s already in it today'),
         field(`Goal (${CONFIG.BASE_CURRENCY})`, goal),
       ]),
+      field('Reach the goal by (optional)', target, 'Pick a month and the app works out how much to save each month.'),
       save,
     ]);
     if (fund) {

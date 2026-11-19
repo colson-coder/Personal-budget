@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   addMonths, monthRange, nper, debtLedger, projectDebt, streamLedger,
-  monthSummary, allocate, simulateFunds, pmt, minimumPayment, bracketTax, taxSummary, taxYearOf,
+  monthSummary, allocate, simulateFunds, pmt, minimumPayment, bracketTax, taxSummary, taxYearOf, goalPace,
 } from '../js/finance.js';
 
 let passed = 0;
@@ -266,6 +266,21 @@ test('assigning money by hand lowers what is left to assign', () => {
   assert.equal(p.manual, 400);
   assert.equal(p.leftToAssign, 1600);
   assert.equal(sim.funds[0].balance, 400);
+});
+
+test('goal dates: per month, on track, behind, reached, overdue', () => {
+  const hist = (deltas) => deltas.map((d, i) => ({ ym: `2026-0${6 + i}`, start: 0, end: d }));
+  const f = (balance, deltas) => ({ goal: 1800, balance, history: [...hist(deltas), { ym: '2026-11', start: balance, end: balance }] });
+  // $640 saved, $1,160 to go, Nov..Jun = 8 months → $145/month.
+  const a = goalPace(f(640, [200, 200, 200]), '2027-06', '2026-11');
+  assert.equal(a.monthsLeft, 8); near(a.perMonth, 145); assert.equal(a.status, 'on_track');
+  assert.equal(a.projectedYM, '2027-04'); // 1160 / 200 → 6 months: Nov..Apr
+  const b = goalPace(f(640, [50, 50, 50]), '2027-06', '2026-11');
+  assert.equal(b.status, 'behind');
+  assert.equal(goalPace(f(1900, [100]), '2027-06', '2026-11').status, 'reached');
+  assert.equal(goalPace(f(640, [100]), '2026-09', '2026-11').status, 'overdue');
+  assert.equal(goalPace({ goal: 1800, balance: 0, history: [{ ym: '2026-11', start: 0, end: 0 }] }, '2027-06', '2026-11').status, 'new');
+  assert.equal(goalPace({ goal: 0, balance: 0, history: [] }, '2027-06', '2026-11'), null);
 });
 
 console.log(`\n${passed} tests passed`);

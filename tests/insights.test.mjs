@@ -119,4 +119,11 @@ test('no plan rules → pay-yourself-first nudge (unless the ladder already says
   assert.ok(!ids(run({ txs: months(2000), funds: [ef(6000)], rules: [] })).includes('no-rules'));
 });
 
+test('a dated goal that is behind gets a tip', () => {
+  const trip = { id: 'trip', name: 'Trip to Lisbon', kind: 'savings', starting_balance: 100, goal_usd: 1800 };
+  const r = run({ txs: months(), funds: [ef(6000), trip], settings: { modules: MODS, fund_targets: { trip: '2027-02' } } });
+  const g = r.find((x) => x.id === 'goal-trip');
+  assert.ok(g && /behind/.test(g.title), ids(r).join(','));
+});
+
 console.log(`\n${passed} insight tests passed`);

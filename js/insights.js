@@ -28,7 +28,7 @@
 // A higher score means more important, and the list comes back sorted.
 // =============================================================================
 
-import { addMonths, monthSummary, debtLedger, projectDebt, taxSummary, r2 } from './finance.js';
+import { addMonths, monthSummary, debtLedger, projectDebt, taxSummary, goalPace, r2 } from './finance.js';
 
 const ymOf = (t) => (t.date || '').slice(0, 7);
 const usd = (t) => Number(t.amount_usd) || 0;
@@ -195,6 +195,22 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
       title: `Your extra savings could pay down ${expensive[0].d.name}`,
       body: `You have about ${fmt(spare)} beyond a 3-month cushion while ${expensive[0].d.name} charges ${expensive[0].apr}%. Paying it down earns that rate, with no risk.`,
       why: 'Highest interest first' });
+  }
+
+  // ---- Goals with a date: falling behind? --------------------------------------------
+  const targets = settings.fund_targets || {};
+  const late = funds
+    .map((f) => ({ f, p: goalPace(f, targets[f.fund.id], todayYM) }))
+    .filter((x) => x.p && (x.p.status === 'behind' || x.p.status === 'overdue'))
+    .sort((a, b) => (b.p.perMonth - b.p.pace) - (a.p.perMonth - a.p.pace))[0];
+  if (late) {
+    const { f, p } = late;
+    add({ id: 'goal-' + f.fund.id, tone: 'tip', score: 44, href: '#/funds',
+      title: p.status === 'overdue' ? `${f.fund.name}: the target date has passed` : `${f.fund.name} is behind schedule`,
+      body: p.status === 'overdue'
+        ? `${fmt(p.left)} is still to go. Pick a new date, or put more toward it each month.`
+        : `To reach it on time, save ${fmt(p.perMonth)} a month. Lately it’s been growing by about ${fmt(Math.max(0, p.pace))}. Add a fixed plan rule for it, or move the date.`,
+      why: 'A goal with a date becomes a plan' });
   }
 
   // ---- Taxes: is enough being set aside? ---------------------------------------------
