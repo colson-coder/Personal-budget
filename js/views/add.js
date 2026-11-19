@@ -8,8 +8,10 @@ import { getSettings } from '../store.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
+import { guessCategory } from './import.js';
+import { merchantKey, parseAmount } from '../importer.js';
 
-export async function renderAdd() {
+export async function renderAdd(params = {}) {
   const safe = (t) => db.list(t).catch(() => []);
   const [categories, history, funds, debts, streams] = await Promise.all([
     db.listCategories(),
@@ -118,6 +120,34 @@ export async function renderAdd() {
     submitBtn,
   ]);
 
+  // --- Quick-add links -------------------------------------------------------
+  // #/add?amount=4.50&merchant=Starbucks&currency=USD&type=expense&date=…&auto=1
+  // A phone automation (iOS Shortcuts "Transaction" trigger, Tasker…) opens
+  // this when a card is tapped, so the purchase arrives already filled in.
+  // auto=1 saves straight away when everything is valid.
+  const fromLink = params.amount || params.merchant;
+  if (fromLink) {
+    const amt = Math.abs(parseAmount(String(params.amount || '')));
+    if (amt > 0) amountInput.value = String(Math.round(amt * 100) / 100);
+    const cur = String(params.currency || '').toUpperCase().trim();
+    if (CONFIG.CURRENCIES.includes(cur)) currencySel.value = cur;
+    if (params.type === 'income') typeIncome.checked = true;
+    if (isValidISODate(params.date || '') && params.date <= todayISO()) dateInput.value = params.date;
+    const merchant = String(params.merchant || params.description || '').trim().slice(0, 120);
+    if (merchant) {
+      descInput.value = merchant;
+      const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
+      const learned = getSettings().import_rules?.[merchantKey(merchant)];
+      const past = pastByDesc.get(merchant.toLowerCase());
+      const guessed = (guessCategory(merchant) || '').split('|').map((n) => byName.get(n.toLowerCase())).find(Boolean);
+      const pick = [learned, past?.category_id, guessed?.id].find((id) => id && categories.some((c) => c.id === id));
+      if (pick) categorySel.value = pick;
+      else if (byName.get('other') && !typeIncome.checked) categorySel.value = byName.get('other').id;
+    }
+    root.querySelector('.view-head')?.append(
+      el('p', { class: 'muted hint' }, 'Filled in from a quick-add link — check it and tap Save.'));
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const amount = parseFloat(amountInput.value);
@@ -160,6 +190,12 @@ export async function renderAdd() {
   });
 
   root.append(form);
+
+  if (fromLink && params.auto === '1' && Number(amountInput.value) > 0 && categorySel.value) {
+    // Wait until the form is on the page (a detached form can't submit).
+    const trySubmit = (n = 0) => form.isConnected ? form.requestSubmit() : n < 50 && setTimeout(() => trySubmit(n + 1), 50);
+    setTimeout(trySubmit, 0);
+  }
 
   // --- Recurring rules (auto-tracking) ---------------------------------------
   // Rent, salary, subscriptions: set once, and the app records them on their

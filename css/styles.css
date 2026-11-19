@@ -903,3 +903,20 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
   .imp-row { grid-template-columns: auto 1fr 260px 120px; grid-template-areas: "box main cat amt"; }
   .imp-amt { text-align: right; }
 }
+.hero-actions .btn { gap: 0; }
+
+/* Coach (Home) — plain-rule tips from js/insights.js */
+.coach-card { margin-bottom: 1rem; }
+.coach-toggle { background: none; border: 0; cursor: pointer; padding: 0; font: inherit; font-size: 0.9rem; font-weight: 600; }
+.coach-item { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.coach-item:first-of-type { border-top: 0; padding-top: 0.25rem; }
+.coach-item:hover { color: var(--text); }
+.coach-item:hover .coach-title { text-decoration: underline; text-underline-offset: 3px; }
+.coach-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 0.45rem; background: var(--text-dim); }
+.tone-warn .coach-dot { background: var(--neg); }
+.tone-good .coach-dot { background: var(--pos); }
+.coach-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.coach-title { font-weight: 600; font-size: 0.95rem; }
+.coach-body { color: var(--text-dim); font-size: 0.875rem; line-height: 1.45; }
+.coach-step { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.coach-why { font-size: 0.75rem; color: var(--text-dim); font-style: italic; margin-top: 0.15rem; opacity: 0.85; }

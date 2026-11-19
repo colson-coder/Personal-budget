@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Babylon's Purse — pay yourself first, in any currency</title>
+  <meta name="description" content="A free personal finance app that builds itself around you: a pay-yourself-first money plan, funds, debts, side income and taxes — in any currency." />
+  <meta property="og:title" content="Babylon's Purse" />
+  <meta property="og:description" content="A part of all you earn is yours to keep. Budget, save, pay down debt and plan taxes — in any currency." />
+  <meta property="og:image" content="./assets/shot-home.jpg" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+  <style>
+    :root {
+      --bg: #000; --elev: #0a0a0a; --line: #1f1f1f; --line-2: #2a2a2a;
+      --text: #ededed; --dim: #8f8f8f; --pos: #4ade80;
+      --max: 1080px;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.55; font-size: 16px;
+    }
+    a { color: inherit; }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+    header.top { position: sticky; top: 0; z-index: 5; background: rgba(0,0,0,.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+    header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; letter-spacing: -.01em; }
+    .brand img { width: 26px; height: 26px; border-radius: 6px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 18px; border-radius: 6px; border: 1px solid var(--line-2); text-decoration: none; font-weight: 600; font-size: .95rem; white-space: nowrap; }
+    .btn:hover { background: #141414; }
+    .btn-primary { background: var(--text); color: #000; border-color: var(--text); }
+    .btn-primary:hover { background: #fff; }
+    .btn-lg { height: 48px; padding: 0 24px; font-size: 1rem; }
+
+    .hero { padding-top: 72px; padding-bottom: 40px; text-align: center; }
+    .eyebrow { display: inline-block; font-size: .8rem; color: var(--dim); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 12px; margin-bottom: 22px; }
+    h1 { font-size: clamp(2.1rem, 6vw, 3.6rem); line-height: 1.08; letter-spacing: -.035em; margin: 0 auto 18px; max-width: 16ch; }
+    .lede { color: var(--dim); font-size: clamp(1.02rem, 2.2vw, 1.2rem); max-width: 40rem; margin: 0 auto 30px; }
+    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .fine { color: var(--dim); font-size: .85rem; margin-top: 14px; }
+
+    .shot { margin: 48px auto 0; border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px rgba(255,255,255,.04); }
+    .shot img { display: block; width: 100%; height: auto; }
+
+    section { padding: 72px 0; border-top: 1px solid var(--line); }
+    h2 { font-size: clamp(1.6rem, 4vw, 2.3rem); letter-spacing: -.03em; line-height: 1.15; margin: 0 0 12px; }
+    .sub { color: var(--dim); max-width: 38rem; margin: 0 0 36px; }
+
+    .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: var(--elev); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.05rem; letter-spacing: -.01em; }
+    .card p { margin: 0; color: var(--dim); font-size: .95rem; }
+    .num { font-variant-numeric: tabular-nums; color: var(--pos); font-weight: 700; font-size: .8rem; letter-spacing: .08em; margin-bottom: 10px; display: block; }
+
+    .split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center; }
+    .split.rev { grid-template-columns: 1fr 1.1fr; }
+    .split.rev .text { order: 2; }
+    .split .shot { margin: 0; }
+    ul.ticks { list-style: none; padding: 0; margin: 0; }
+    ul.ticks li { padding: 8px 0 8px 28px; position: relative; color: var(--dim); }
+    ul.ticks li b { color: var(--text); font-weight: 600; }
+    ul.ticks li::before { content: ""; position: absolute; left: 2px; top: 15px; width: 12px; height: 7px; border-left: 2px solid var(--pos); border-bottom: 2px solid var(--pos); transform: rotate(-45deg); }
+
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .grid .card { padding: 18px; }
+    .grid .card h3 { font-size: .98rem; }
+    .grid .card p { font-size: .88rem; }
+
+    .phone { max-width: 300px; margin: 0 auto; border-radius: 28px; }
+
+    details { border-bottom: 1px solid var(--line); padding: 16px 0; }
+    details summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::after { content: "+"; color: var(--dim); font-weight: 400; }
+    details[open] summary::after { content: "–"; }
+    details p { color: var(--dim); margin: 10px 0 0; }
+
+    .final { text-align: center; }
+    .final .sub { margin: 0 auto 28px; }
+    footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--dim); font-size: .85rem; }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    footer a { color: var(--dim); }
+
+    @media (max-width: 860px) {
+      .three, .grid { grid-template-columns: 1fr 1fr; }
+      .split, .split.rev { grid-template-columns: 1fr; gap: 28px; }
+      .split.rev .text { order: 0; }
+    }
+    @media (max-width: 560px) {
+      .wrap { padding: 0 16px; }
+      .hero { padding-top: 48px; padding-bottom: 24px; }
+      section { padding: 52px 0; }
+      .three, .grid { grid-template-columns: 1fr; }
+      header.top .btn { height: 36px; padding: 0 12px; }
+      .cta .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./welcome.html"><img src="./icons/icon-192.png" alt="" />Babylon's Purse</a>
+      <a class="btn btn-primary" href="./index.html">Open the app</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <span class="eyebrow">Free during early access</span>
+      <h1>A part of all you earn is yours to keep.</h1>
+      <p class="lede">Babylon's Purse is a money app that builds itself around you. Tell it how you get paid and how you want to split it. It saves first, budgets the rest, tracks your debts and side income, and keeps tax money aside, in any currency.</p>
+      <div class="cta">
+        <a class="btn btn-primary btn-lg" href="./index.html">Start free</a>
+        <a class="btn btn-lg" href="#how">See how it works</a>
+      </div>
+      <p class="fine">No bank login needed. Try it without an account: your data stays on your device.</p>
+      <div class="shot"><img src="./assets/shot-home.jpg" alt="The Home board: money left to assign, income, spending, funds, debts and taxes" width="1600" height="1012" /></div>
+    </div>
+
+    <section id="how">
+      <div class="wrap">
+        <h2>Pay yourself first, automatically.</h2>
+        <p class="sub">Most budget apps show you where your money went. This one decides where it goes before you spend it.</p>
+        <div class="three">
+          <div class="card"><span class="num">01</span><h3>Answer a few questions</h3><p>Your home currency, how you're paid, what you want to track. It takes about two minutes, and you can switch any part on or off later.</p></div>
+          <div class="card"><span class="num">02</span><h3>Set your money plan</h3><p>Save 10% of every paycheck, put a fixed amount toward a goal, and split the rest. Each rule can use a dollar amount or a percent.</p></div>
+          <div class="card"><span class="num">03</span><h3>Log, assign, done</h3><p>Add spending in a tap or import your bank's file. Every month you see what's left to assign and where it's going.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap split">
+        <div class="text">
+          <h2>Built for people with more than one paycheck.</h2>
+          <p class="sub">Side hustle, freelance work, a second currency? Most trackers assume one salary in one country. This one doesn't.</p>
+          <ul class="ticks">
+            <li><b>Any currency.</b> Every entry converts at its own day's rate and totals show in your home currency.</li>
+            <li><b>Side income in a tap.</b> Log a gig payment and set part of it aside right away.</li>
+            <li><b>Taxes for any country.</b> Use one rate or your own brackets, with a tax year starting in any month.</li>
+          </ul>
+        </div>
+        <div class="shot"><img src="./assets/shot-plan.jpg" alt="The money plan: rules that split income into funds" width="1600" height="1012" loading="lazy" /></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap split rev">
+        <div class="shot"><img src="./assets/shot-taxes.jpg" alt="The tax estimate: owed so far, paid, set aside monthly" width="1600" height="1012" loading="lazy" /></div>
+        <div class="text">
+          <h2>No surprise tax bill.</h2>
+          <p class="sub">Mark which income already has tax taken out and which doesn't. The app estimates what you'll owe and tells you how much to set aside each month.</p>
+          <ul class="ticks">
+            <li><b>A full-year forecast</b> based on how you're earning so far</li>
+            <li><b>Status for each quarter</b> for estimated payments</li>
+            <li><b>Deductible expenses</b> are taken off automatically</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Everything a full finance system does.</h2>
+        <p class="sub">Only the parts you switch on appear. Turn any of them off later and your data is kept.</p>
+        <div class="grid">
+          <div class="card"><h3>Budgets</h3><p>Start with three categories and add your own. Unused money can roll over to next month.</p></div>
+          <div class="card"><h3>Funds</h3><p>Emergency fund, giving, goals. Interest is tracked whether it's in a savings account or as cash.</p></div>
+          <div class="card"><h3>Debts</h3><p>Built on your minimum payment. Pay extra and it shows your new payoff date.</p></div>
+          <div class="card"><h3>Passive income</h3><p>Dividends, royalties, rentals, a side business. See if each one is behind or ahead.</p></div>
+          <div class="card"><h3>Recurring</h3><p>Enter rent, salary or subscriptions once and they're logged every month.</p></div>
+          <div class="card"><h3>Bank import</h3><p>Use the CSV or OFX file your bank already gives you. Categories are learned from how you sort them.</p></div>
+          <div class="card"><h3>Reports</h3><p>A month in review, a 12-month trend, savings rate and your top categories.</p></div>
+          <div class="card"><h3>Your data</h3><p>Back up or export everything in one tap. Use it with an account or entirely on your device.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap split">
+        <div class="text">
+          <h2>On your phone and your computer.</h2>
+          <p class="sub">Install it like an app on iPhone, Android, Mac or Windows, with no app store needed. With an account, everything syncs between your devices.</p>
+          <ul class="ticks">
+            <li><b>iPhone:</b> open in Safari, then Share → Add to Home Screen</li>
+            <li><b>Mac:</b> in Safari, choose File → Add to Dock</li>
+            <li><b>Android or Windows:</b> choose Install app in the browser menu</li>
+          </ul>
+        </div>
+        <div class="shot phone"><img src="./assets/shot-phone.jpg" alt="The app on a phone" width="780" height="1688" loading="lazy" /></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Questions</h2>
+        <div>
+          <details><summary>Does it connect to my bank?</summary><p>Not directly yet. Download a CSV or OFX file from your bank's website and import it. The app reads most formats, spots duplicates and learns your categories. On iPhone you can also set up a Shortcut that logs Apple Pay purchases as you make them.</p></details>
+          <details><summary>Is my data private?</summary><p>Without an account, everything stays in your browser on your device. With an account, your data is stored so that only you can read it. Nothing is sold or shared.</p></details>
+          <details><summary>Does it work outside the US?</summary><p>Yes. Choose any home currency and timezone, log entries in other currencies, and set the tax rules for where you live.</p></details>
+          <details><summary>Is this tax or financial advice?</summary><p>No. Tax figures are estimates to help you plan. Check with a qualified professional before you file.</p></details>
+          <details><summary>What does it cost?</summary><p>It's free during early access. If paid extras are added later, the core tracker will stay free.</p></details>
+          <details><summary>Why "Babylon's Purse"?</summary><p>It's named after the classic parable <i>The Richest Man in Babylon</i>, whose first rule is to keep a part of everything you earn. The money plan follows that rule.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="wrap">
+        <h2>Start keeping what you earn.</h2>
+        <p class="sub">Setup takes about two minutes. You don't need a card or a bank login.</p>
+        <a class="btn btn-primary btn-lg" href="./index.html">Open Babylon's Purse</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© Babylon's Purse. Estimates only. Not financial or tax advice.</span>
+      <span><a href="./index.html">Open the app</a> · <a href="https://github.com/colson-coder/Personal-budget">Source</a></span>
+    </div>
+  </footer>
+</body>
+</html>
