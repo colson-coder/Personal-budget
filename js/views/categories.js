@@ -55,15 +55,20 @@ export async function renderCategories() {
   const out = rows.filter((r) => r.kind !== 'income');
   const budgeted = out.reduce((a, r) => a + r.budget, 0);
   const spentTotal = out.reduce((a, r) => a + r.amount, 0);
-  const left = budgeted - spentTotal;
+  // Left / over compares budgets only with spending in budgeted categories,
+  // so unbudgeted spending never shows up as "over".
+  const spentBudgeted = out.filter((r) => r.budget > 0).reduce((a, r) => a + r.amount, 0);
+  const left = budgeted - spentBudgeted;
   const summary = el('div', { class: 'card budget-summary' }, [
     el('div', { class: 'bs-row' }, [
       stat('Budgeted', fmtUSD(budgeted)),
       stat('Spent', fmtUSD(spentTotal)),
-      stat(left >= 0 ? 'Left' : 'Over', fmtUSD(Math.abs(left)), left >= 0 ? 'pos' : 'neg'),
+      budgeted > 0
+        ? stat(left >= 0 ? 'Left' : 'Over', fmtUSD(Math.abs(left)), left >= 0 ? 'pos' : 'neg')
+        : stat('Left', '—', 'muted'),
     ]),
   ]);
-  if (budgeted > 0) summary.append(progress(spentTotal / budgeted, { over: spentTotal > budgeted }));
+  if (budgeted > 0) summary.append(progress(spentBudgeted / budgeted, { over: spentBudgeted > budgeted }));
   else summary.append(el('p', { class: 'muted small' }, 'Tap a category to give it a monthly budget.'));
   root.append(summary);
 

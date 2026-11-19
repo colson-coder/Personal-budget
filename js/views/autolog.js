@@ -68,11 +68,9 @@ export function autoLogCard() {
         el('a', { href: quickAddURL({ amount: '4.50', merchant: 'Test%20Coffee', auto: false }) }, 'Try a test link'),
         '.',
       ]),
-      platform === 'iphone'
-        ? el('p', { class: 'small autolog-note' }, isLocalMode()
+      ...(platform !== 'iphone' ? [] : [el('p', { class: 'small autolog-note' }, isLocalMode()
           ? `Heads up: links open in Safari, and this device-only (local) mode keeps data separate for Safari and the home-screen app. To use this, create an account so both see the same data.`
-          : `Links open in Safari, so sign in to ${CONFIG.APP_NAME} in Safari once.`)
-        : null,
+          : `Links open in Safari, so sign in to ${CONFIG.APP_NAME} in Safari once.`)]),
     );
   }
   draw();

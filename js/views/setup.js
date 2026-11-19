@@ -51,6 +51,7 @@ export function renderSetup(onDone) {
     timezone: deviceTz,
     modules: { plan: true, debts: false, income: false, taxes: false },
     tax: { main_income: 'withheld', rate: 15, set_aside: 0, year_start_month: 1 },
+    keepPct: 10,     // pay yourself first: % of ALL income into Savings
     givingPct: 0,
     emergencyGoal: 1000,
     emergencyPct: 25,
@@ -175,11 +176,16 @@ export function renderSetup(onDone) {
 
     return el('div', { class: 'setup-step' }, [
       el('h1', {}, 'Your money plan'),
-      el('p', { class: 'muted' }, 'After bills and spending, what’s left each month gets split like this. Leave anything at 0 to skip it.'),
-      el('div', { class: 'row-2' }, [
-        field('Give away (% of net income)', num('givingPct', { max: '100' }), 'Charity, church, causes'),
-        field('Savings already set aside', num('savingsBalance', { placeholder: '0' }), `In ${state.base}`),
+      el('p', { class: 'muted' }, 'Each month your money gets split like this, automatically. Leave anything at 0 to skip it.'),
+      el('div', { class: 'plan-group plan-group-first' }, [
+        el('div', { class: 'plan-group-title' }, 'Pay yourself first'),
+        el('p', { class: 'muted small' }, '“A part of all you earn is yours to keep.” This share goes to Savings the moment you’re paid, before bills or spending. 10% is the classic rule.'),
+        el('div', { class: 'row-2' }, [
+          field('Keep (% of income)', num('keepPct', { max: '100' })),
+          field(`Already saved (${state.base})`, num('savingsBalance', { placeholder: '0' })),
+        ]),
       ]),
+      field('Give away (% of what’s left)', num('givingPct', { max: '100' }), 'Charity, church, causes. Counted after bills and spending.'),
       el('div', { class: 'plan-group' }, [
         el('div', { class: 'plan-group-title' }, 'Emergency fund'),
         el('div', { class: 'row-3' }, [
@@ -264,7 +270,8 @@ export function renderSetup(onDone) {
   function stepDone() {
     const items = [`Home currency: ${state.base}`, `Timezone: ${state.timezone.replace(/_/g, ' ')}`];
     if (state.modules.plan) {
-      if (Number(state.givingPct) > 0) items.push(`${state.givingPct}% of net income to Giving`);
+      if (Number(state.keepPct) > 0) items.push(`${state.keepPct}% of all income to Savings, before anything else`);
+      if (Number(state.givingPct) > 0) items.push(`${state.givingPct}% of what’s left to Giving`);
       for (const r of state.setAsides.filter((r) => r.name && Number(r.amount) > 0)) items.push(`${r.amount} ${state.base}/month to ${r.name}`);
       if (Number(state.emergencyGoal) > 0 && Number(state.emergencyPct) > 0) items.push(`${state.emergencyPct}% of what’s left to an Emergency Fund until ${state.emergencyGoal} ${state.base}`);
     }
@@ -323,8 +330,9 @@ export function renderSetup(onDone) {
             value: Number(state.emergencyPct), value_after_goal: Number(state.emergencyAfterPct) || 0,
           });
         }
-        if (Number(state.savingsBalance) > 0) {
-          await db.create('funds', { name: 'Savings', kind: 'savings', starting_balance: Number(state.savingsBalance), goal_usd: 0, apy, interest_mode: apy > 0 ? 'auto' : 'none' });
+        if (Number(state.keepPct) > 0 || Number(state.savingsBalance) > 0) {
+          const f = await db.create('funds', { name: 'Savings', kind: 'savings', starting_balance: Number(state.savingsBalance) || 0, goal_usd: 0, apy, interest_mode: apy > 0 ? 'auto' : 'none' });
+          if (Number(state.keepPct) > 0) rules.unshift({ id: crypto.randomUUID(), fund_id: f.id, method: 'percent_income', value: Number(state.keepPct) });
         }
       }
       if (state.modules.debts && state.debt.name.trim() && Number(state.debt.principal) > 0) {

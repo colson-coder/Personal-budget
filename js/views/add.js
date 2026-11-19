@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { db } from '../db.js';
-import { getSettings, saveSettings } from '../store.js';
+import { getSettings, saveSettings, kindOf } from '../store.js';
 import { CONFIG } from '../config.js';
 import { convertToUSD } from '../rates.js';
 import { el, toast, todayISO, isValidISODate } from '../util.js';
@@ -48,9 +48,33 @@ export async function renderAdd(params = {}) {
   }
   const datalist = el('datalist', { id: 'desc-suggestions' },
     [...pastByDesc.values()].slice(0, 50).map((t) => el('option', { value: t.description })));
+  // Start on "Other" rather than whichever category sorts first.
+  const otherCat = categories.find((c) => c.name.toLowerCase() === 'other');
+  if (otherCat) categorySel.value = otherCat.id;
+  // Once the user picks a category themselves, stop guessing over it.
+  let catTouched = false;
+  categorySel.addEventListener('change', () => { catTouched = true; });
+  const byNameAdd = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
+  function guessFromText(text) {
+    const learned = getSettings().import_rules?.[merchantKey(text)];
+    if (learned && categories.some((c) => c.id === learned)) return learned;
+    return (guessCategory(text) || '').split('|').map((n) => byNameAdd.get(n.toLowerCase())).find(Boolean)?.id || null;
+  }
   descInput.addEventListener('input', () => {
     const match = pastByDesc.get(descInput.value.trim().toLowerCase());
-    if (!match) return;
+    if (!match) {
+      // New description: guess from learned shop rules and keywords (Rent → Housing & Bills).
+      if (catTouched) return;
+      const id = guessFromText(descInput.value);
+      if (id) {
+        categorySel.value = id;
+        const gc = categories.find((c) => c.id === id); if (gc && kindOf(gc) === 'income') typeIncome.checked = true; else typeExpense.checked = true;
+        syncOpts();
+      } else if (otherCat && categorySel.value !== otherCat.id) {
+        categorySel.value = otherCat.id; // nothing recognised: back to the neutral default
+      }
+      return;
+    }
     if (match.category_id && [...categorySel.options].some((o) => o.value === match.category_id)) {
       categorySel.value = match.category_id;
     }

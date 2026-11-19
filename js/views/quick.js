@@ -11,20 +11,23 @@ import { ensureCategory, getSettings } from '../store.js';
 import { convertToBase } from '../rates.js';
 import { el, fmtUSD, toast, todayISO, openSheet, field, isValidISODate } from '../util.js';
 
-// Log income. Defaults to a "Side income" category (taxed as income you owe
-// tax on) so side-hustle money is ready for the Taxes page.
+// Log income: a paycheck (main "Income" category, tax usually taken out) or
+// side income (tax owed, so it shows up on the Taxes page).
 export function incomeSheet({ categories, onDone, onAssign }) {
   openSheet('Add income', (close) => {
     const amount = el('input', { type: 'number', step: '0.01', min: '0', inputmode: 'decimal', placeholder: '0.00' });
     const currency = el('select', {}, CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c)));
-    const what = el('input', { type: 'text', placeholder: 'e.g. Logo design for a client, eBay sale' });
+    const what = el('input', { type: 'text', placeholder: 'e.g. Paycheck, logo design for a client' });
     const date = el('input', { type: 'date', value: todayISO(), max: todayISO() });
     const incomeCats = categories.filter((c) => c.kind === 'income' && !['Interest', 'Passive Income'].includes(c.name));
     const hasSide = incomeCats.some((c) => c.name === 'Side income');
     const cat = el('select', {}, [
       ...(hasSide ? [] : [el('option', { value: '__side' }, 'Side income')]),
-      ...incomeCats.map((c) => el('option', { value: c.id, selected: c.name === 'Side income' ? 'selected' : null }, c.name)),
+      ...incomeCats.map((c) => el('option', { value: c.id }, c.name === 'Income' ? 'Paycheck / main income' : c.name)),
     ]);
+    // Default to the main income category when there is one.
+    const main = incomeCats.find((c) => c.name === 'Income');
+    if (main) cat.value = main.id;
     const save = el('button', { class: 'btn btn-primary btn-block' }, 'Add income');
 
     save.addEventListener('click', async () => {
@@ -42,7 +45,7 @@ export function incomeSheet({ categories, onDone, onAssign }) {
         const { amount_usd, exchange_rate } = await convertToBase(amt, currency.value, date.value);
         await db.createTransaction({
           type: 'income', date: date.value, amount: amt, currency: currency.value, amount_usd, exchange_rate,
-          category_id, description: what.value.trim() || 'Side income',
+          category_id, description: what.value.trim() || cat.selectedOptions[0]?.textContent || 'Income',
         });
         close();
         toast(`${fmtUSD(amount_usd)} added`, 'success');
@@ -56,7 +59,7 @@ export function incomeSheet({ categories, onDone, onAssign }) {
       el('div', { class: 'row-2' }, [field('Amount', amount), field('Currency', currency)]),
       field('What was it for?', what),
       el('div', { class: 'row-2' }, [field('Type', cat), field('Date', date)]),
-      el('p', { class: 'muted small' }, 'Side income counts as income you owe tax on, so it shows up on the Taxes page.'),
+      el('p', { class: 'muted small' }, 'Pick Side income for gigs, freelance work or sales. It counts as income you owe tax on, so it shows up on the Taxes page.'),
       save,
     ]);
   });
