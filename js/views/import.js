@@ -273,7 +273,7 @@ export async function renderImport() {
 // list alternatives ("Food|Food & Dining"); the first one the user has wins.
 const CATEGORY_KEYWORDS = [
   ['Transport', ['uber', 'lyft', 'didi', 'taxi', 'gas station', 'shell', 'chevron', 'exxon', 'gasolina', 'fuel', 'parking', 'metro', 'transit', 'train', 'bahn', 'sncf', 'renfe', 'trenitalia', 'tfl', 'bvg', 'tankstelle', 'aral']],
-  ['Food|Food & Dining|Groceries', ['restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonald', 'grocer', 'supermarket', 'supermercado', 'whole foods', 'trader joe', 'kroger', 'safeway', 'aldi', 'lidl', 'tesco', 'walmart', 'food', 'pizza', 'bakery', 'doordash', 'uber eats', 'grubhub', 'rewe', 'edeka', 'netto', 'penny', 'carrefour', 'mercadona', 'sainsbury', 'asda', 'albert heijn', 'monoprix', 'lieferando', 'deliveroo', 'restaurante', 'bäckerei']],
+  ['Food|Food & Dining|Groceries', ['restaurant', 'cafe', 'café', 'coffee', 'soda', 'starbucks', 'mcdonald', 'grocer', 'supermarket', 'supermercado', 'whole foods', 'trader joe', 'kroger', 'safeway', 'aldi', 'lidl', 'tesco', 'walmart', 'food', 'pizza', 'bakery', 'doordash', 'uber eats', 'grubhub', 'rewe', 'edeka', 'netto', 'penny', 'carrefour', 'mercadona', 'sainsbury', 'asda', 'albert heijn', 'monoprix', 'lieferando', 'deliveroo', 'restaurante', 'bäckerei']],
   ['Subscriptions|Entertainment', ['netflix', 'spotify', 'youtube', 'icloud', 'apple.com', 'hbo', 'disney', 'prime video', 'subscription', 'openai', 'chatgpt', 'patreon']],
   ['Phone & Internet|Utilities|Housing & Bills', ['verizon', 'at&t', 't-mobile', 'comcast', 'xfinity', 'internet', 'mobile', 'phone']],
   ['Utilities|Housing & Bills', ['electric', 'water', 'power', 'utility', 'gas bill', 'energy']],

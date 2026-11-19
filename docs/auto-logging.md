@@ -17,12 +17,19 @@ Apple Wallet and Google Wallet have **no web API**, so a website can't read
 them. Both phones do let their *own* automation apps react to a payment, and
 that's enough.
 
-- **iPhone, iOS 17 or later:** in the Shortcuts app, the *Transaction* automation
-  runs whenever a Wallet card is tapped. It hands over the **amount**, the
-  **merchant**, and the card name. The shortcut opens:
-  ```
-  https://colson-coder.github.io/Personal-budget/#/add?amount=[Amount]&merchant=[Merchant]&auto=1
-  ```
+- **iPhone, iOS 17 or later:** in the Shortcuts app, the *Wallet* automation
+  (called *Transaction* on some iOS versions) runs whenever a Wallet card is
+  tapped. Build it **inside the automation** (New Blank Automation), because only
+  there does Shortcut Input offer **Merchant** and **Amount**. The actions are:
+  1. URL Encode (Shortcut Input → Merchant)
+  2. Text, containing:
+     ```
+     https://colson-coder.github.io/Personal-budget/#/add?auto=1&merchant=[URL Encoded Text]&amount=[Amount]
+     ```
+  3. Open URLs
+
+  Once `CONFIG.SHORTCUT_URL` holds an iCloud link to a shared shortcut, users
+  can tap *Get the shortcut* instead, then pick it in the Wallet automation.
 - **Android:** MacroDroid (free) or Tasker reacts to the Google Wallet or bank-app
   notification, pulls the amount and shop name out of its text, and opens the
   same link.
@@ -30,8 +37,9 @@ that's enough.
 What the app does with the link (`js/views/add.js`):
 - **Amount:** reads any format: `$4.50`, `€4,50`, `₡2.500`, `1.234,56 €`.
 - **Currency:** taken from the symbol or code in the amount (€ → EUR, ₡ → CRC,
-  "USD"), or from an explicit `&currency=`. Otherwise it uses the last currency
-  used.
+  "USD"), or from an explicit `&currency=`. A bare `$` means the home currency
+  when that's a dollar or peso, and USD otherwise. With no symbol at all, it
+  uses the home currency.
 - **Category:** chosen from what the user picked for that merchant before, then
   from rules learned during import, then from keyword guesses (Uber → Transport,
   Starbucks → Food…). If none of those match, it falls back to Other.
