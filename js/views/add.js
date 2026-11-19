@@ -209,6 +209,7 @@ export async function renderAdd(params = {}) {
       // Saved from a quick-add link without a tap: show what happened, with Undo
       // (also guards against someone else's link adding an entry).
       if (fromLink && params.auto === '1' && saved?.id) showUndo(saved, categorySel.selectedOptions[0]?.textContent);
+      if (fromLink && !getSettings().autolog_seen) saveSettings({ autolog_seen: true }).catch(() => {});
       localStorage.setItem('pb_last_currency', currency);
       // Learn the shop → category pairing (shared with bank import), so the
       // next purchase there is categorised the same way.

@@ -381,7 +381,7 @@ input[type="file"] { padding: 0.6rem; }
 
 /* --- Toasts ----------------------------------------------------------------------- */
 /* Top of the screen, so messages never cover a sheet's buttons or the tab bar. */
-#toast-host { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 0.5rem; width: calc(100% - 2rem); max-width: 420px; }
+#toast-host { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 0.5rem; width: calc(100% - 2rem); max-width: 420px; }
 .toast {
   padding: 0.7rem 1rem; border-radius: var(--radius-sm); font-size: 0.9rem;
   opacity: 0; transform: translateY(-10px); transition: opacity 0.2s, transform 0.2s;
@@ -1000,3 +1000,16 @@ input[type="range"] { width: 100%; min-height: 32px; padding: 0; background: tra
 .undo-actions { display: flex; gap: 0.4rem; flex: none; }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stat-grid + .progress { margin-top: 1rem; }
+
+/* Home → Getting started checklist */
+.start-card { margin-bottom: 1rem; }
+.start-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.start-list li { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-top: 1px solid var(--border); font-size: 0.95rem; }
+.start-list li:first-child { border-top: 0; }
+.start-list li.done { color: var(--text-dim); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.start-check { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; }
+.start-list li.done .start-check { background: var(--pos); border-color: var(--pos); color: #000; }
+.start-list a, .start-btn { color: var(--text); font-weight: 600; text-decoration: none; }
+.start-btn { text-decoration: none; text-align: left; }
+.start-list a:hover, .start-btn:hover { text-decoration: underline; }
+.start-help:not(:empty) { margin-top: 0.6rem; padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-elev-2); }
