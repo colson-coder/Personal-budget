@@ -130,6 +130,7 @@ test('repeating charges: subscriptions found, groceries and known rules skipped'
   const m4 = ['2026-08', '2026-09', '2026-10', '2026-11'];
   const txs = [
     ...m4.map((m) => tx('expense', m + '-04', 15.49, 'fun', { description: 'NETFLIX.COM 8XK2', currency: 'USD' })),
+    tx('expense', '2026-10-05', 15.49, 'fun', { description: 'NETFLIX.COM 9QQ1', currency: 'USD' }), // a double charge
     ...m4.slice(1).map((m, i) => tx('expense', m + '-0' + (5 + i), 11.99, 'fun', { description: 'Spotify', currency: 'USD' })),
     ...m4.map((m, i) => tx('expense', m + '-1' + i, 80 + i * 30, 'food', { description: 'Whole Foods', currency: 'USD' })), // amounts vary
     ...m4.map((m) => tx('expense', m + '-02', 1500, 'rent', { description: 'Rent', currency: 'USD' })),
