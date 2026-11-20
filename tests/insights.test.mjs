@@ -144,4 +144,15 @@ test('repeating charges: subscriptions found, groceries and known rules skipped'
   assert.ok(coach.some((x) => x.id === 'subs' && /2 repeating charges/.test(x.title)), coach.map((x) => x.title).join(' | '));
 });
 
+test('a plan that starts next month: warn, and nothing is split this month', () => {
+  const txs = [...months(), tx('income', '2026-11-01', 3000, 'inc')];
+  const funds = [ef(6000)];
+  const settings = { modules: MODS, plan: { start_month: '2026-12', rules: [{ id: 'r', fund_id: 'ef', method: 'fixed', value: 150 }] } };
+  const sim = simulateFunds({ settings, funds, txs, catById, todayYM });
+  assert.equal(sim.planFor('2026-11').lines.length, 0);
+  assert.equal(sim.funds[0].balance, 6000 + sim.funds[0].totals.interest);
+  const r = buildInsights({ settings, categories: cats, catById, txs, funds, debts: [], streams: [], sim, todayYM }, { today: '2026-11-20', max: 30 });
+  assert.ok(ids(r).includes('plan-later'), ids(r).join(','));
+});
+
 console.log(`\n${passed} insight tests passed`);

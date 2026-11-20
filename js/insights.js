@@ -37,6 +37,7 @@ const usd = (t) => Number(t.amount_usd) || 0;
 // Debt at or above this APR is "expensive": paying it off beats any safe return.
 export const HIGH_APR = 8;
 const BABYLON = 'The Richest Man in Babylon';
+const monthName = (ym) => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const LADDER = 6;
 
 export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, max = 8 } = {}) {
@@ -94,6 +95,13 @@ export function buildInsights(data, { fmt = (n) => String(r2(n)), today = null, 
 
   if (m.plan && sim) {
     const plan = sim.planFor(todayYM);
+    const startYM = settings.plan?.start_month;
+    if (startYM && startYM > todayYM && (settings.plan?.rules || []).length && plan.summary.income > 0) {
+      add({ id: 'plan-later', tone: 'warn', score: 96, href: '#/settings?section=plan',
+        title: `Your money plan doesn’t start until ${monthName(startYM)}`,
+        body: `So this month’s income isn’t being split into your funds. To start now, go to Settings → Money plan and set “Plan starts” to this month.`,
+        why: 'Pay yourself first' });
+    }
     if (plan.leftToAssign < -0.5) {
       add({ id: 'overspent', tone: 'warn', score: 95, href: '#/plan',
         title: `${fmt(-plan.leftToAssign)} more went out than came in this month`,

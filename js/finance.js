@@ -198,8 +198,9 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
       if (plans.has(ym)) return plans.get(ym);
       // Months outside the simulated window (future, or before plan start):
       // compute a standalone plan using current balances.
+      // Months before the plan starts aren't split, matching the fund balances.
       const summary = monthSummary(ym, txs, catById);
-      return withManual({ summary, ...allocate(summary, rules, fundsById, { ...bal }) }, ym, txs);
+      return withManual({ summary, ...allocate(summary, ym < start ? [] : rules, fundsById, { ...bal }) }, ym, txs);
     },
   };
 }
