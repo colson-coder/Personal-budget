@@ -13,12 +13,13 @@ import {
   el, fmtUSD, toast, todayISO, openSheet, field, progress, shortMonth, fmtMonths, isValidISODate,
 } from '../util.js';
 import { navigate } from '../router.js';
+import { applyRecurring } from '../recurring.js';
 
 const refresh = () => navigate('/debts');
 
 export async function renderDebts() {
   const data = await loadAll();
-  const { debts, txs, todayYM } = data;
+  const { debts, txs, todayYM, recurring = [] } = data;
 
   const root = el('div', { class: 'view view-debts' });
   root.append(el('div', { class: 'view-head' }, [
@@ -44,7 +45,7 @@ export async function renderDebts() {
     tile('Paid so far', fmtUSD(ledgers.reduce((a, x) => a + x.l.totalPaid, 0)), 'pos'),
   ]));
 
-  for (const { debt, l } of ledgers) root.append(debtCard(debt, l, todayYM));
+  for (const { debt, l } of ledgers) root.append(debtCard(debt, l, todayYM, recurring.find((r) => r.debt_id === debt.id && r.active !== false), txs));
   return root;
 }
 
@@ -62,7 +63,46 @@ function stat(label, value, tone) {
   ]);
 }
 
-function debtCard(debt, l, todayYM) {
+// --- Automatic payments -------------------------------------------------------------
+// A recurring rule linked to the debt logs the payment on its due day every
+// month, so it comes out of income like any bill and the payoff date updates.
+export async function startAutoPay(debt, txs) {
+  const cat = await ensureCategory('Debt Payment', 'debt');
+  const ym = todayISO().slice(0, 7);
+  // Already logged a payment this month? Start next month so it isn't counted twice.
+  const paidThisMonth = (txs || []).some((t) => t.debt_id === debt.id && (t.date || '').startsWith(ym));
+  await db.createRecurring({
+    type: 'expense', amount: minimumPayment(debt), currency: CONFIG.BASE_CURRENCY, category_id: cat.id,
+    day_of_month: debt.due_day || 1, description: `${debt.name} payment`, debt_id: debt.id,
+    last_applied: paidThisMonth ? ym : null, active: true,
+  });
+  await applyRecurring();
+}
+async function stopAutoPay(debtId) {
+  for (const r of await db.listRecurring().catch(() => [])) if (r.debt_id === debtId) await db.deleteRecurring(r.id);
+}
+
+function autoPayLine(debt, rule, txs) {
+  if (rule) {
+    return el('div', { class: 'autopay on' }, [
+      el('span', { class: 'small' }, `✓ ${fmtUSD(Number(rule.amount))} is taken out automatically on day ${rule.day_of_month} each month.`),
+      el('button', { class: 'btn btn-ghost btn-sm', onClick: async () => {
+        if (!confirm('Stop logging this payment automatically? Payments already logged are kept.')) return;
+        await stopAutoPay(debt.id); toast('Automatic payment stopped', 'info'); refresh();
+      } }, 'Stop'),
+    ]);
+  }
+  return el('div', { class: 'autopay' }, [
+    el('span', { class: 'muted small' }, 'Payments aren’t coming out of your money yet. Log each one, or let the app do it every month.'),
+    el('button', { class: 'btn btn-sm', onClick: async (e) => {
+      e.currentTarget.disabled = true;
+      try { await startAutoPay(debt, txs); toast(`${debt.name} payment will be logged every month`, 'success'); refresh(); }
+      catch (err) { toast('Could not set up: ' + err.message, 'error'); e.currentTarget.disabled = false; }
+    } }, 'Take it out automatically'),
+  ]);
+}
+
+function debtCard(debt, l, todayYM, rule, txs) {
   const card = el('div', { class: 'card debt-card' }, [
     el('div', { class: 'fund-top' }, [
       el('span', { class: 'fund-icon debt-icon' }, '⌂'),
@@ -99,8 +139,10 @@ function debtCard(debt, l, todayYM) {
   if (last?.status === 'upcoming') {
     card.append(el('p', { class: 'muted small' }, `This month’s ${fmtUSD(l.minimum)} payment is due on day ${debt.due_day || 1}.`));
   }
-  card.append(el('p', { class: 'muted small' },
-    'We assume you pay the minimum every month. Log a payment when you pay more (or less) and the payoff date updates.'));
+  card.append(autoPayLine(debt, rule, txs));
+  card.append(el('p', { class: 'muted small' }, rule
+    ? 'Paid more (or less) one month? Log it and the payoff date updates.'
+    : 'Until then, the payoff date assumes you pay the minimum. Log a payment when you pay more (or less).'));
 
   card.append(whatIf(debt, l));
 
@@ -179,6 +221,7 @@ function debtSheet(debt) {
     };
     [payment, term, principal, apr].forEach((i) => i.addEventListener('input', recalc));
     const start = el('input', { type: 'month', value: debt?.start_month || todayISO().slice(0, 7) });
+    const auto = el('input', { type: 'checkbox', checked: 'checked' });
     const save = el('button', { class: 'btn btn-primary btn-block' }, debt ? 'Save' : 'Add debt');
 
     save.addEventListener('click', async () => {
@@ -193,7 +236,15 @@ function debtSheet(debt) {
       if (!(row.payment > 0) && !row.term_months) return toast('Enter the minimum payment, or the loan length so we can work it out', 'error');
       save.disabled = true;
       try {
-        if (debt) await db.update('debts', debt.id, row); else await db.create('debts', row);
+        if (debt) {
+          await db.update('debts', debt.id, row);
+          // Keep an automatic payment in step with the new amount and due day.
+          const rule = (await db.listRecurring().catch(() => [])).find((r) => r.debt_id === debt.id);
+          if (rule) await db.updateRecurring(rule.id, { amount: minimumPayment({ ...debt, ...row }), day_of_month: row.due_day, description: `${row.name} payment` });
+        } else {
+          const created = await db.create('debts', row);
+          if (auto.checked) await startAutoPay(created, []);
+        }
         toast('Saved', 'success'); close(); refresh();
       } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
     });
@@ -205,11 +256,13 @@ function debtSheet(debt) {
       el('div', { class: 'row-2' }, [field('Or: loan length (months)', term, 'If you don’t know the payment'), field('Payment due day', due)]),
       calc,
       field('Starting month', start),
+      debt ? null : el('label', { class: 'check-row' }, [auto, el('span', {}, 'Take the payment out of my money automatically each month')]),
       save,
     ]);
     if (debt) {
       body.append(el('button', { class: 'btn btn-ghost btn-block danger', onClick: async () => {
         if (!confirm(`Delete "${debt.name}"? Logged payments stay as transactions.`)) return;
+        await stopAutoPay(debt.id);
         await db.remove('debts', debt.id);
         toast('Debt deleted', 'info'); close(); refresh();
       } }, 'Delete debt'));
