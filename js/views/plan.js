@@ -53,7 +53,7 @@ export async function renderPlan(params = {}) {
       el('a', { class: 'link', href: '#/settings?section=plan' }, 'Edit plan'),
     ]),
   ]);
-  if (!plan.lines.length && !plan.manual) {
+  if (!plan.lines.length && !plan.manual && !plan.interestIn) {
     alloc.append(el('div', { class: 'empty' }, [
       el('p', {}, 'You haven’t set a money plan yet.'),
       el('p', { class: 'muted small' }, 'Decide once — e.g. “10% to giving, $150 to a business reserve, 25% of what’s left to the emergency fund” — and every month is split for you. Or assign money by hand from Home.'),
@@ -68,6 +68,15 @@ export async function renderPlan(params = {}) {
           el('span', { class: 'rec-meta' }, l.note),
         ]),
         el('span', { class: 'alloc-amt' }, fmtUSD(l.amount)),
+      ]));
+    }
+    if (plan.interestIn > 0) {
+      alloc.append(el('div', { class: 'alloc-row' }, [
+        el('div', { class: 'rec-main' }, [
+          el('span', { class: 'rec-desc' }, 'Interest from your funds'),
+          el('span', { class: 'rec-meta' }, 'Last month’s interest, added to your everyday money'),
+        ]),
+        el('span', { class: 'alloc-amt pos' }, '+' + fmtUSD(plan.interestIn)),
       ]));
     }
     if (plan.manual > 0) {
