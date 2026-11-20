@@ -19,7 +19,7 @@ export const FUND_KINDS = [
   { value: 'spending', label: 'Spending money', icon: '◎' },
 ];
 const kindMeta = (k) => FUND_KINDS.find((x) => x.value === k) || FUND_KINDS[0];
-const INTEREST_LABEL = (f) => f.interestMode === 'auto' ? `earns ${f.fund.apy}% APY`
+const INTEREST_LABEL = (f, data) => f.interestMode === 'auto' ? `earns ${f.fund.apy}% APY${interestDestLabel(f.fund.id, data)}`
   : f.interestMode === 'manual' ? 'interest logged by you' : 'no interest (cash)';
 export const INTEREST_MODES = [
   { value: 'auto', label: 'In an account that pays interest — estimate it for me' },
@@ -63,6 +63,15 @@ export async function renderFunds() {
   return root;
 }
 
+// " → Spending Money" when this fund's interest is sent somewhere else.
+function interestDestLabel(id, data) {
+  const to = getSettings().interest_to?.[id];
+  if (!to || to === id) return '';
+  if (to === 'everyday') return ' → everyday money';
+  const f = data?.funds?.find((x) => x.id === to);
+  return f ? ` → ${f.name}` : '';
+}
+
 function tile(label, value, tone) {
   return el('div', { class: 'card summary-card' }, [
     el('div', { class: 'summary-label' }, label),
@@ -81,9 +90,9 @@ function fundCard(f, data) {
       el('span', { class: 'fund-icon' }, meta.icon),
       el('div', { class: 'rec-main' }, [
         el('span', { class: 'rec-desc' }, f.fund.name),
-        el('span', { class: 'rec-meta' }, [meta.label, ' · ', INTEREST_LABEL(f)].join('')),
+        el('span', { class: 'rec-meta' }, [meta.label, ' · ', INTEREST_LABEL(f, data)].join('')),
       ]),
-      el('button', { class: 'icon-btn', title: 'Edit fund', onClick: () => fundSheet(f.fund) }, '✎'),
+      el('button', { class: 'icon-btn', title: 'Edit fund', onClick: () => fundSheet(f.fund, refresh, data.funds) }, '✎'),
     ]),
     el('div', { class: 'fund-balance ' + (f.balance < 0 ? 'neg' : '') }, fmtUSD(f.balance)),
   ]);
@@ -144,7 +153,7 @@ function chip(value, label, tone) {
 }
 
 // Create / edit a fund.
-export function fundSheet(fund, onDone = refresh) {
+export function fundSheet(fund, onDone = refresh, allFunds = []) {
   openSheet(fund ? `Edit ${fund.name}` : 'New fund', (close) => {
     const name = el('input', { type: 'text', value: fund?.name || '', placeholder: 'e.g. Emergency Fund' });
     const kind = el('select', {}, FUND_KINDS.map((k) => el('option', { value: k.value, selected: (fund?.kind || 'savings') === k.value ? 'selected' : null }, k.label)));
@@ -156,7 +165,16 @@ export function fundSheet(fund, onDone = refresh) {
     const defaultMode = fund ? interestMode(fund) : 'none';
     const mode = el('select', {}, INTEREST_MODES.map((m) => el('option', { value: m.value, selected: m.value === defaultMode ? 'selected' : null }, m.label)));
     const apyField = field('Interest rate (APY %)', apy);
-    const syncMode = () => { apyField.style.display = mode.value === 'auto' ? '' : 'none'; };
+    // Where the interest goes (settings.interest_to, no database column needed).
+    const curDest = (fund && getSettings().interest_to?.[fund.id]) || 'self';
+    const others = allFunds.filter((x) => !fund || x.id !== fund.id);
+    const dest = el('select', {}, [
+      el('option', { value: 'self' }, 'Keep it in this fund'),
+      ...others.map((x) => el('option', { value: x.id, selected: curDest === x.id ? 'selected' : null }, `Move it to ${x.name}`)),
+      el('option', { value: 'everyday', selected: curDest === 'everyday' ? 'selected' : null }, 'Everyday money (to spend or assign)'),
+    ]);
+    const destField = field('Where should the interest go?', dest, 'Added at the end of each month.');
+    const syncMode = () => { apyField.style.display = destField.style.display = mode.value === 'auto' ? '' : 'none'; };
     mode.addEventListener('change', syncMode);
     syncMode();
     const save = el('button', { class: 'btn btn-primary btn-block' }, fund ? 'Save' : 'Create fund');
@@ -179,7 +197,9 @@ export function fundSheet(fund, onDone = refresh) {
         if (fund) { await db.update('funds', fund.id, row); saved = fund; } else saved = await db.create('funds', row);
         const targets = { ...(getSettings().fund_targets || {}) };
         if (by && row.goal_usd > 0) targets[saved.id] = by; else delete targets[saved.id];
-        await saveSettings({ fund_targets: targets });
+        const interestTo = { ...(getSettings().interest_to || {}) };
+        if (dest.value !== 'self' && row.interest_mode === 'auto') interestTo[saved.id] = dest.value; else delete interestTo[saved.id];
+        await saveSettings({ fund_targets: targets, interest_to: interestTo });
         toast(fund ? 'Fund saved' : 'Fund created', 'success');
         close(); onDone();
       } catch (err) { toast('Could not save: ' + err.message, 'error'); save.disabled = false; }
@@ -190,6 +210,7 @@ export function fundSheet(fund, onDone = refresh) {
       field('Type', kind),
       field('Where is this money kept?', mode, 'Money you hold as cash earns nothing, so it isn’t given interest.'),
       apyField,
+      destField,
       el('div', { class: 'row-2' }, [
         field(`Current balance (${CONFIG.BASE_CURRENCY})`, start, 'What’s already in it today'),
         field(`Goal (${CONFIG.BASE_CURRENCY})`, goal),

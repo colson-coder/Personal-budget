@@ -286,4 +286,23 @@ test('goal dates: per month, on track, behind, reached, overdue', () => {
   assert.equal(goalPace(born, '2027-06', '2026-11').status, 'new');
 });
 
+test('interest can go to the same fund, another fund, or everyday money', () => {
+  const fs = [
+    { id: 'sv', name: 'Savings', kind: 'savings', starting_balance: 12000, apy: 6, interest_mode: 'auto' },
+    { id: 'sp', name: 'Spending', kind: 'spending', starting_balance: 0, apy: 0, interest_mode: 'none' },
+  ];
+  const run = (to) => simulateFunds({ settings: { plan: { start_month: '2026-01', rules: [] }, interest_to: to }, funds: fs, txs: [], catById: new Map(), todayYM: '2026-02' });
+  const same = run({});
+  assert.equal(same.funds[0].balance, 12060);           // 6%/12 of 12,000
+  const moved = run({ sv: 'sp' });
+  assert.equal(moved.funds[0].balance, 12000);
+  assert.equal(moved.funds[1].balance, 60);
+  assert.equal(moved.interestToDate, 60);
+  const everyday = run({ sv: 'everyday' });
+  assert.equal(everyday.funds[0].balance + everyday.funds[1].balance, 12000);
+  assert.equal(everyday.planFor('2026-02').leftToAssign, 60); // shows up next month
+  assert.equal(everyday.interestByMonth.get('2026-01'), 60);   // still taxable income
+  assert.equal(run({ sv: 'deleted-fund' }).funds[0].balance, 12060); // unknown target → stays put
+});
+
 console.log(`\n${passed} tests passed`);

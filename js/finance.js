@@ -13,7 +13,9 @@
 //                                           (10% once its goal is reached)"
 //   • Funds           earmarked balances (envelopes): starting balance
 //                     + plan allocations + money added − money spent from it
-//                     + interest (APY, credited monthly for completed months)
+//                     + interest (APY, credited monthly for completed months).
+//                     settings.interest_to[fundId] can send a fund's interest
+//                     to another fund, or 'everyday' (left to assign next month)
 //   • Debts           monthly amortization ledger driven by logged payments
 //   • Passive income  received vs expected per stream
 //   • Taxes           estimated tax on income not taxed at source, deductions,
@@ -131,6 +133,14 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
     totals[f.id] = { allocated: 0, added: 0, spent: 0, interest: 0 };
   }
 
+  // Where each fund's estimated interest goes: its own balance by default.
+  const interestTo = settings?.interest_to || {};
+  const destOf = (id) => {
+    const to = interestTo[id];
+    return to === 'everyday' ? 'everyday' : to && fundsById.has(to) ? to : id;
+  };
+  let toEveryday = 0; // interest sent to everyday money, added to next month's left to assign
+
   const plans = new Map();
   const interestByMonth = new Map();
   for (const ym of monthRange(first, todayYM)) {
@@ -141,7 +151,7 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
     if (ym >= start) {
       const summary = monthSummary(ym, txs, catById);
       const plan = allocate(summary, rules, fundsById, startBal);
-      plans.set(ym, withManual({ summary, ...plan }, ym, txs));
+      plans.set(ym, withManual({ summary, ...plan }, ym, txs, toEveryday));
       for (const l of plan.lines) {
         if (delta[l.fund_id]) { delta[l.fund_id].alloc += l.amount; bal[l.fund_id] += l.amount; }
       }
@@ -154,15 +164,21 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
     }
     // Estimated interest is credited at the end of each completed month — only
     // for funds kept somewhere that pays interest (cash in hand earns nothing).
+    // Interest the user logged is already in delta; add the estimated interest.
+    let monthInterest = (funds || []).reduce((a, f) => a + delta[f.id].interest, 0);
+    toEveryday = 0;
     if (ym < todayYM) {
-      for (const f of funds || []) {
-        if (interestMode(f) !== 'auto') continue;
-        const i = r2(Math.max(0, bal[f.id]) * (Number(f.apy) || 0) / 100 / 12);
-        delta[f.id].interest += i;
-        bal[f.id] += i;
+      const earned = (funds || []).filter((f) => interestMode(f) === 'auto')
+        .map((f) => [f.id, r2(Math.max(0, bal[f.id]) * (Number(f.apy) || 0) / 100 / 12)]);
+      for (const [id, i] of earned) {
+        monthInterest += i;
+        const to = destOf(id);
+        if (to === 'everyday') { toEveryday += i; continue; }
+        delta[to].interest += i;
+        bal[to] += i;
       }
     }
-    interestByMonth.set(ym, r2((funds || []).reduce((a, f) => a + delta[f.id].interest, 0)));
+    interestByMonth.set(ym, r2(monthInterest));
     for (const f of funds || []) {
       const d = delta[f.id];
       totals[f.id].allocated += d.alloc; totals[f.id].added += d.added;
@@ -191,7 +207,7 @@ export function simulateFunds({ settings, funds, txs, catById, todayYM }) {
   return {
     funds: result,
     total: r2(result.reduce((s, x) => s + x.balance, 0)),
-    interestToDate: r2(result.reduce((s, x) => s + x.totals.interest, 0)),
+    interestToDate: r2([...interestByMonth.values()].reduce((s, x) => s + x, 0)),
     interestByMonth,
     plans,
     planFor(ym) {
@@ -211,10 +227,11 @@ export function manualAssigned(ym, txs) {
   return r2(txs.filter((t) => t.type === 'transfer' && t.fund_id && ymOf(t) === ym)
     .reduce((a, t) => a + usd(t), 0));
 }
-function withManual(plan, ym, txs) {
+// `interestIn` = last month's fund interest sent to everyday money.
+function withManual(plan, ym, txs, interestIn = 0) {
   const manual = manualAssigned(ym, txs);
   const auto = r2(plan.lines.reduce((a, l) => a + l.amount, 0));
-  return { ...plan, manual, autoAssigned: auto, leftToAssign: r2(plan.unallocated - manual) };
+  return { ...plan, manual, autoAssigned: auto, interestIn: r2(interestIn), leftToAssign: r2(plan.unallocated - manual + interestIn) };
 }
 
 // 'auto' = estimate from APY · 'manual' = user logs actual interest · 'none' = cash
