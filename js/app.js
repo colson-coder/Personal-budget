@@ -184,8 +184,21 @@ async function signOut() {
 // file:// — the app must be served over http(s).
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch((e) =>
-      console.warn('SW registration failed:', e));
+    navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+      // An installed app can stay open for days: check for an update whenever
+      // it comes back to the screen.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    }).catch((e) => console.warn('SW registration failed:', e));
+  });
+  // When a new version takes over, reload once so every file is the new one.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
   });
 }
 

@@ -11,7 +11,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v25';
+const CACHE_VERSION = 'pb-shell-v26';
 
 const APP_SHELL = [
   './',
@@ -85,8 +85,13 @@ self.addEventListener('fetch', (event) => {
 
   // Same-origin: network-first. Users always get the newest version when
   // online (no stale app after a deploy); the cache is the offline fallback.
+  // cache: 'no-cache' asks the server whether each file changed (cheap, uses
+  // ETags), so the browser's own 10-minute cache can't hold back an update.
+  const fresh = req.mode === 'navigate'
+    ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    : new Request(req, { cache: 'no-cache' });
   event.respondWith(
-    fetch(req).then((res) => {
+    fetch(fresh).then((res) => {
       if (res && res.status === 200 && res.type === 'basic') {
         const copy = res.clone();
         caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
