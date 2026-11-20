@@ -11,6 +11,7 @@ import { el, toast, todayISO, isValidISODate } from '../util.js';
 import { guessCategory } from './import.js';
 import { merchantKey, parseAmount } from '../importer.js';
 import { detectRepeats } from '../insights.js';
+import { applyRecurring } from '../recurring.js';
 
 export async function renderAdd(params = {}) {
   const safe = (t) => db.list(t).catch(() => []);
@@ -260,15 +261,19 @@ export async function renderAdd(params = {}) {
     setTimeout(trySubmit, 0);
   }
 
-  // --- Recurring rules (auto-tracking) ---------------------------------------
-  // Rent, salary, subscriptions: set once, and the app records them on their
-  // day every month automatically (see js/recurring.js).
-  root.append(await recurringCard(categories, history));
+  // Monthly expenses live on the Expenses page (#/expenses); point people there.
+  root.append(el('a', { class: 'card bills-link', href: '#/expenses' }, [
+    el('div', { class: 'rec-main' }, [
+      el('span', { class: 'rec-desc' }, 'Pay the same expense every month?'),
+      el('span', { class: 'rec-meta' }, 'Rent, insurance, phone, subscriptions: add them once under Expenses → Monthly and they’re taken out automatically.'),
+    ]),
+    el('span', { class: 'bills-link-go' }, 'Monthly expenses →'),
+  ]));
 
   return root;
 }
 
-async function recurringCard(categories, history = []) {
+export async function recurringCard(categories, history = []) {
   const card = el('div', { class: 'card' });
 
   async function reload() {
@@ -278,12 +283,33 @@ async function recurringCard(categories, history = []) {
     } catch { /* table missing on old setups */ }
 
     card.replaceChildren(
-      el('div', { class: 'card-head' }, [el('h2', {}, 'Recurring (automatic)')]),
+      el('div', { class: 'card-head' }, [el('h2', {}, 'Monthly expenses and income')]),
       el('p', { class: 'muted hint' },
-        'These are added automatically every month on their day — rent, salary, subscriptions.'),
+        'Each one is logged for you on its day every month, so the money comes out of your budget without you doing anything.'),
     );
 
     const catById = new Map(categories.map((c) => [c.id, c]));
+
+    if (!rules.length) {
+      card.append(el('p', { class: 'muted' }, 'Nothing yet. Add your first one below.'));
+    }
+    for (const r of rules) {
+      card.append(el('div', { class: 'rec-row' }, [
+        el('div', { class: 'rec-main' }, [
+          el('span', { class: 'rec-desc' }, r.description || catById.get(r.category_id)?.name || 'Recurring'),
+          el('span', { class: 'rec-meta' },
+            `Day ${r.day_of_month} · ${catById.get(r.category_id)?.name ?? '—'}${r.debt_id ? ' · loan payment' : r.type === 'income' ? ' · income' : ''}`),
+        ]),
+        el('span', { class: 'rec-amt ' + (r.type === 'income' ? 'pos' : 'neg') },
+          `${Number(r.amount).toLocaleString()} ${r.currency}`),
+        el('button', { class: 'icon-btn', title: 'Stop this monthly expense', onClick: async () => {
+          if (!confirm('Stop this monthly expense? Months already logged are kept.')) return;
+          await db.deleteRecurring(r.id);
+          toast('Stopped', 'info');
+          reload();
+        } }, '🗑'),
+      ]));
+    }
 
     // Suggestions: things that already repeat every month in the history.
     const todayYM = todayISO().slice(0, 7);
@@ -318,27 +344,6 @@ async function recurringCard(categories, history = []) {
       ]));
     }
 
-    if (!rules.length) {
-      card.append(el('p', { class: 'muted' }, 'No recurring transactions yet.'));
-    }
-    for (const r of rules) {
-      card.append(el('div', { class: 'rec-row' }, [
-        el('div', { class: 'rec-main' }, [
-          el('span', { class: 'rec-desc' }, r.description || catById.get(r.category_id)?.name || 'Recurring'),
-          el('span', { class: 'rec-meta' },
-            `Day ${r.day_of_month} · ${catById.get(r.category_id)?.name ?? '—'} · ${r.type}`),
-        ]),
-        el('span', { class: 'rec-amt ' + (r.type === 'income' ? 'pos' : 'neg') },
-          `${Number(r.amount).toLocaleString()} ${r.currency}`),
-        el('button', { class: 'icon-btn', title: 'Delete rule', onClick: async () => {
-          if (!confirm('Stop this recurring transaction? Already-added months are kept.')) return;
-          await db.deleteRecurring(r.id);
-          toast('Recurring rule removed', 'info');
-          reload();
-        } }, '🗑'),
-      ]));
-    }
-
     // Add-rule form
     const rType = el('select', {}, [
       el('option', { value: 'expense' }, 'Expense'),
@@ -346,10 +351,18 @@ async function recurringCard(categories, history = []) {
     ]);
     const rAmount = el('input', { type: 'number', step: '0.01', min: '0', placeholder: 'Amount', inputmode: 'decimal' });
     const rCurrency = el('select', {}, CONFIG.CURRENCIES.map((c) => el('option', { value: c }, c)));
-    const rCat = el('select', {}, categories.map((c) => el('option', { value: c.id }, c.name)));
+    // Default to a fixed-bills category (not a loan or income one).
+    const defCat = categories.find((c) => kindOf(c) === 'hard') || categories.find((c) => !['income', 'debt'].includes(kindOf(c)));
+    const rCat = el('select', {}, categories.map((c) => el('option', { value: c.id, selected: c.id === defCat?.id ? 'selected' : null }, c.name)));
     const rDay = el('input', { type: 'number', min: '1', max: '31', value: '1', title: 'Day of month', inputmode: 'numeric' });
-    const rDesc = el('input', { type: 'text', placeholder: 'e.g. Rent, Salary, Netflix' });
-    const addBtn = el('button', { class: 'btn btn-primary btn-sm' }, 'Add recurring');
+    const rDesc = el('input', { type: 'text', placeholder: 'e.g. Rent, Car insurance, Netflix' });
+    const addBtn = el('button', { class: 'btn btn-primary btn-sm' }, 'Add monthly expense');
+    // Pick a sensible category from the name as you type (Rent → Housing & Bills).
+    rDesc.addEventListener('input', () => {
+      const g = (guessCategory(rDesc.value) || '').split('|')
+        .map((n) => categories.find((c) => c.name.toLowerCase() === n.toLowerCase() && kindOf(c) !== 'income')).find(Boolean);
+      if (g && rType.value === 'expense') rCat.value = g.id;
+    });
 
     addBtn.addEventListener('click', async () => {
       const amount = parseFloat(rAmount.value);
@@ -358,12 +371,22 @@ async function recurringCard(categories, history = []) {
       if (!(day >= 1 && day <= 31)) return toast('Day must be 1–31', 'error');
       addBtn.disabled = true;
       try {
+        // Already logged this month by hand (same name, or same amount and category)?
+        // Then start next month so it isn't counted twice.
+        const ym = todayISO().slice(0, 7);
+        const desc = rDesc.value.trim().toLowerCase();
+        const already = history.some((t) => (t.date || '').startsWith(ym) && t.type === rType.value
+          && ((desc && (t.description || '').trim().toLowerCase() === desc)
+            || (Math.abs(Number(t.amount) - amount) < 0.005 && t.currency === rCurrency.value && t.category_id === rCat.value)));
         await db.createRecurring({
           type: rType.value, amount, currency: rCurrency.value,
           category_id: rCat.value, day_of_month: day,
-          description: rDesc.value.trim(), last_applied: null, active: true,
+          description: rDesc.value.trim(), last_applied: already ? ym : null, active: true,
         });
-        toast('Recurring rule added — it starts this month', 'success');
+        const n = await applyRecurring();
+        toast(already ? 'Added. You’ve already logged this month’s, so it starts next month'
+          : n ? 'Added, and this month’s is already logged' : 'Added. It will be logged on its day each month', 'success');
+        rAmount.value = ''; rDesc.value = '';
         reload();
       } catch (err) {
         toast('Could not add rule: ' + (err.message || 'unknown error'), 'error');

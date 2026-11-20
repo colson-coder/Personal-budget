@@ -106,6 +106,7 @@ function startCard(data) {
   const steps = [
     { done: txs.some((t) => t.type === 'income'), label: 'Add this month’s income', href: null, action: 'income' },
     { done: txs.some((t) => t.type === 'expense'), label: 'Log an expense', href: '#/add' },
+    { done: (data.recurring || []).some((r) => r.type === 'expense'), label: 'Add your monthly expenses (rent, loan, bills)', href: '#/expenses' },
     { done: categories.some((c) => Number(c.monthly_budget_usd) > 0), label: 'Set a budget for one category', href: '#/categories' },
     ...(isPhone() ? [
       { done: installed() || settings.installed_seen, label: 'Add the app to your Home Screen', href: null, action: 'install' },

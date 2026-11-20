@@ -12,6 +12,7 @@ import { renderAuth } from './views/auth.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderTransactions } from './views/transactions.js';
 import { renderAdd } from './views/add.js';
+import { renderExpenses } from './views/expenses.js';
 import { renderCategories } from './views/categories.js';
 import { renderImport } from './views/import.js';
 import { renderReports } from './views/reports.js';
@@ -119,6 +120,7 @@ function renderShell() {
   defineRoute('/dashboard', renderDashboard);
   defineRoute('/transactions', renderTransactions);
   defineRoute('/add', renderAdd);
+  defineRoute('/expenses', renderExpenses);
   defineRoute('/categories', renderCategories);
   defineRoute('/import', renderImport);
   defineRoute('/reports', renderReports);

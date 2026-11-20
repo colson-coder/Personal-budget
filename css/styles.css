@@ -1013,3 +1013,17 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .start-btn { text-decoration: none; text-align: left; }
 .start-list a:hover, .start-btn:hover { text-decoration: underline; }
 .start-help:not(:empty) { margin-top: 0.6rem; padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-elev-2); }
+
+/* Debt card: automatic payment status */
+.autopay { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.8rem; margin: 0.6rem 0 0.3rem; }
+.autopay span { flex: 1 1 14rem; }
+.autopay.on { border-color: color-mix(in srgb, var(--pos, #3ecf8e) 45%, var(--border)); }
+
+/* Expenses page: Monthly / One-time tabs */
+.tabs { display: flex; gap: 0.25rem; border: 1px solid var(--border); border-radius: 10px; padding: 0.25rem; margin: 0 0 1rem; max-width: 360px; }
+.tab { flex: 1; background: none; border: 0; border-radius: 7px; padding: 0.55rem 0.75rem; color: var(--text-dim); font: inherit; font-weight: 600; cursor: pointer; min-height: 40px; }
+.tab.active { background: var(--text); color: var(--bg); }
+.view-expenses .tile { min-height: auto; margin-bottom: 1rem; }
+.view-expenses .tile-value { font-size: 1.6rem; font-weight: 700; }
+.bills-link { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; color: var(--text); text-decoration: none; }
+.bills-link-go { font-weight: 600; white-space: nowrap; }
