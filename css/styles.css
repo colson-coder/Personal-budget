@@ -1027,3 +1027,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .view-expenses .tile-value { font-size: 1.6rem; font-weight: 700; }
 .bills-link { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; color: var(--text); text-decoration: none; }
 .bills-link-go { font-weight: 600; white-space: nowrap; }
+
+/* Sign-in errors stay visible */
+.auth-error { color: var(--neg, #f87171); font-size: 0.85rem; margin: 0.25rem 0 0.75rem; line-height: 1.4; }
+.auth-error[hidden] { display: none; }
+
+/* "A new version is ready" bar (never reload by itself) */
+.update-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); z-index: 60; display: flex; align-items: center; gap: 0.75rem; background: var(--bg-elev-2); border: 1px solid var(--border-strong); border-radius: 12px; padding: 0.6rem 0.75rem 0.6rem 1rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); width: max-content; max-width: calc(100vw - 32px); font-size: 0.9rem; }

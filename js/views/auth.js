@@ -33,6 +33,8 @@ export function renderAuth(onAuthed) {
       required: 'required',
     });
 
+    // Errors stay on screen (not just a 3-second toast) so they can be read.
+    const errorBox = el('p', { class: 'auth-error', role: 'alert', hidden: 'hidden' });
     const submitBtn = el(
       'button',
       { class: 'btn btn-primary btn-block', type: 'submit' },
@@ -48,6 +50,7 @@ export function renderAuth(onAuthed) {
       emailInput,
       el('label', { for: 'auth-pass' }, 'Password'),
       passInput,
+      errorBox,
       submitBtn,
       el('p', { class: 'auth-switch' }, [
         mode === 'login' ? "No account? " : 'Have an account? ',
@@ -89,6 +92,7 @@ export function renderAuth(onAuthed) {
       if (!email || !password) return;
       submitBtn.disabled = true;
       submitBtn.textContent = 'Please wait…';
+      errorBox.hidden = true;
       try {
         setLocalMode(false);
         if (mode === 'signup') {
@@ -101,7 +105,8 @@ export function renderAuth(onAuthed) {
           onAuthed();
         }
       } catch (err) {
-        toast(err.message || 'Authentication failed', 'error');
+        errorBox.textContent = friendlyAuthError(err);
+        errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = mode === 'login' ? 'Log in' : 'Create account';
       }
@@ -112,4 +117,15 @@ export function renderAuth(onAuthed) {
 
   draw();
   return root;
+}
+
+// Plain-language sign-in errors, keeping the original text for anything unknown.
+export function friendlyAuthError(err) {
+  const msg = String(err?.message || err || '');
+  if (/invalid login credentials/i.test(msg)) return 'That email and password don’t match. Check for typos (and Caps Lock), or sign up if you’re new.';
+  if (/email not confirmed/i.test(msg)) return 'Please confirm your email first: open the link we sent you, then log in.';
+  if (/failed to fetch|load failed|networkerror|network request failed/i.test(msg)) return 'Can’t reach the server. Check your internet connection and try again.';
+  if (/rate limit|too many/i.test(msg)) return 'Too many tries in a short time. Wait a minute and try again.';
+  if (/already registered|already exists/i.test(msg)) return 'There’s already an account with that email. Log in instead.';
+  return msg ? `Couldn’t log in: ${msg}` : 'Couldn’t log in. Please try again.';
 }

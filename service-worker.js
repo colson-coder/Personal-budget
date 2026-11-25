@@ -11,7 +11,7 @@
 // changes instead of being stuck behind a stale cache.
 // =============================================================================
 
-const CACHE_VERSION = 'pb-shell-v26';
+const CACHE_VERSION = 'pb-shell-v27';
 
 const APP_SHELL = [
   './',
@@ -87,9 +87,9 @@ self.addEventListener('fetch', (event) => {
   // online (no stale app after a deploy); the cache is the offline fallback.
   // cache: 'no-cache' asks the server whether each file changed (cheap, uses
   // ETags), so the browser's own 10-minute cache can't hold back an update.
-  const fresh = req.mode === 'navigate'
-    ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' })
-    : new Request(req, { cache: 'no-cache' });
+  // Page loads are passed through untouched: rebuilding a navigation request
+  // changes how redirects are handled, which Safari rejects.
+  const fresh = req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' });
   event.respondWith(
     fetch(fresh).then((res) => {
       if (res && res.status === 200 && res.type === 'basic') {

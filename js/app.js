@@ -192,13 +192,15 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       });
     }).catch((e) => console.warn('SW registration failed:', e));
   });
-  // When a new version takes over, reload once so every file is the new one.
+  // A new version took over while the app was open. Never reload by itself
+  // (that could interrupt a login or a purchase being saved): offer a button.
   const hadController = !!navigator.serviceWorker.controller;
-  let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadController || reloaded) return;
-    reloaded = true;
-    location.reload();
+    if (!hadController || document.getElementById('update-bar')) return;
+    document.body.append(el('div', { id: 'update-bar', class: 'update-bar', role: 'status' }, [
+      el('span', {}, 'A new version of the app is ready.'),
+      el('button', { class: 'btn btn-sm btn-primary', onClick: () => location.reload() }, 'Refresh'),
+    ]));
   });
 }
 

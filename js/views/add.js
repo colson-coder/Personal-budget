@@ -164,7 +164,10 @@ export async function renderAdd(params = {}) {
     const bareDollar = !sym && /\$/.test(String(params.amount || ''))
       ? (DOLLARISH.includes(CONFIG.BASE_CURRENCY) ? CONFIG.BASE_CURRENCY : 'USD') : null;
     const cur = String(params.currency || code || (sym && SYMBOLS[sym]) || bareDollar || CONFIG.BASE_CURRENCY).toUpperCase().trim();
-    if (CONFIG.CURRENCIES.includes(cur)) currencySel.value = cur;
+    // A currency that isn't in the user's list is added for this entry rather
+    // than silently saving ₡5,000 as $5,000.
+    if (/^[A-Z]{3}$/.test(cur) && !CONFIG.CURRENCIES.includes(cur)) currencySel.append(el('option', { value: cur }, cur));
+    if (/^[A-Z]{3}$/.test(cur)) currencySel.value = cur;
     if (params.type === 'income') typeIncome.checked = true;
     if (isValidISODate(params.date || '') && params.date <= todayISO()) dateInput.value = params.date;
     const merchant = String(params.merchant || params.description || '').trim().slice(0, 120);
